@@ -17,12 +17,56 @@ BarPOS is an open‑source, MIT‑licensed application that replaces proprietary
 | **Transparent**     | Audit log planned for money‑ and stock‑affecting actions.                       |
 | **Tested**          | Test coverage planned with pytest and httpx.                                    |
 
+## High‑Level Architecture
+
+```
+Streamlit UI (temporary)
+          ▲
+          │ HTTP API calls
+          ▼
+      FastAPI + SQLModel
+               │
+               └─ SQLite (development)
+```
+
+**Note:** Current implementation uses Streamlit for rapid prototyping. Production UI will be web-based.
+
+## Current Implementation Status
+
+| Module                     | Status                                       |
+| -------------------------- | -------------------------------------------- |
+| Basic Models               | ✅ Client, Order, OrderItem, Item            |
+| FastAPI Backend            | ✅ Basic CRUD endpoints                      |
+| Streamlit Frontend         | ✅ Client and order management               |
+| SQLModel Database          | ✅ SQLite for development                    |
+| **Not Yet Implemented:**   |                                              |
+| Product Categories         | ❌ Planned                                   |
+| Stock Management           | ❌ Planned                                   |
+| User Authentication        | ❌ Planned                                   |
+| Shifts Management          | ❌ Planned                                   |
+| Payment Processing         | ❌ Planned                                   |
+| WebSocket Real-time        | ❌ Planned                                   |
+| Recipe Components          | ❌ Planned                                   |
+| Audit Logging              | ❌ Planned                                   |
+
+## Technology Stack
+
+| Component | Technology | Status |
+| --------- | ---------- | ------ |
+| Backend API | FastAPI | ✅ Implemented |
+| Database ORM | SQLModel | ✅ Implemented |
+| Database | SQLite (dev) | ✅ Implemented |
+| Frontend (temp) | Streamlit | ✅ Implemented |
+| Frontend (planned) | Web-based | ❌ Planned |
+| Real-time | WebSocket | ❌ Planned |
+| Background jobs | Celery | ❌ Planned |
+| Caching | Redis | ❌ Planned |
 
 ## Development Roadmap
 
 | Phase | Focus | Status |
 | ----- | ----- | ------ |
-| **Phase 1** | Basic CRUD operations | ❌ Planned |
+| **Phase 1** | Basic CRUD operations | ✅ In Progress |
 | **Phase 2** | User authentication & shifts | ❌ Planned |
 | **Phase 3** | Stock management & recipes | ❌ Planned |
 | **Phase 4** | Payment processing | ❌ Planned |
