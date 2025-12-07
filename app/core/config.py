@@ -3,9 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict # type: ignore
 
 
 class DatabaseConfig(BaseModel):
-    # url: PostgresDsn = PostgresDsn(url="postgresql://postgres:postgres@db:5432/postgres")
-    sqlite_file_name: str = "database.db"
-    url: str = f"sqlite:///{sqlite_file_name}"
+    url: PostgresDsn = PostgresDsn(url="postgresql://postgres:postgres@db:5432/postgres")
 
 
 class Settings(BaseSettings):
