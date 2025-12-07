@@ -4,7 +4,7 @@ from sqlmodel import create_engine, SQLModel, Session
 from .config import settings
 
 
-connect_args = {"check_same_thread": False}
+connect_args = {}#"check_same_thread": False}
 engine = create_engine(str(settings.database.url), connect_args=connect_args)
 
 def create_db_and_tables():
