@@ -9,7 +9,7 @@ ENV PIP_NO_CACHE_DIR=1 \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY app.py /app/app.py
+COPY . /app/
 
 ENV STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_PORT=8501 \

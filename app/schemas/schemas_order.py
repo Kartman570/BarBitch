@@ -1,77 +1,119 @@
-from sqlmodel import SQLModel
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
 
 # ==== USER SCHEMAS ====
+
 class UserCreate(BaseModel):
     name: str
+    role: str = "barman"
 
 class UserRead(BaseModel):
     id: int
     name: str
+    role: str
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
 
 
 # ==== ITEM SCHEMAS ====
-class ItemCreate(BaseModel):
-    quantity: Optional[float] = 0.0
-    name: str
-    is_active: bool = True
-    price: float
-    uom: str  # (unit of measurement, e.g. 3 item, 500 ml, 200 gram)
-    discount: Optional[float] = 0.0  # (% -1:1)
 
+class ItemCreate(BaseModel):
+    name: str
+    price: float
+    category: Optional[str] = None
+    is_available: bool = True
 
 class ItemRead(BaseModel):
     id: int
-    quantity: Optional[float] = 0.0
     name: str
-    is_active: bool
     price: float
-    uom: str  # (unit of measurement, e.g. 3 item, 500 ml, 200 gram)
-    discount: Optional[float] = 0.0  # (% -1:1)
-
+    category: Optional[str]
+    is_available: bool
 
 class ItemUpdate(BaseModel):
-    quantity: Optional[float] = None
     name: Optional[str] = None
-    is_active: Optional[bool] = None
     price: Optional[float] = None
-    uom: Optional[str] = None  # (unit of measurement, e.g. 3 item, 500 ml, 200 gram)
-    discount: Optional[float] = None  # (% -1:1)
+    category: Optional[str] = None
+    is_available: Optional[bool] = None
+
+
+# ==== TABLE SCHEMAS ====
+
+class TableCreate(BaseModel):
+    table_name: str
+
+class TableRead(BaseModel):
+    id: int
+    table_name: str
+    status: str
+    total: float
+    created_at: datetime
+    updated_at: datetime
+    closed_at: Optional[datetime] = None
+
+class TableUpdate(BaseModel):
+    table_name: Optional[str] = None
+
+class TableReadDetailed(BaseModel):
+    id: int
+    table_name: str
+    status: str
+    total: float
+    created_at: datetime
+    updated_at: datetime
+    closed_at: Optional[datetime] = None
+    orders: List["OrderRead"] = []
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==== ORDER SCHEMAS ====
-class OrderCreate(BaseModel):
-    client: str
-    table: str  # (where client sit)
 
+class OrderCreate(BaseModel):
+    item_id: int
+    quantity: float = 1.0
 
 class OrderRead(BaseModel):
     id: int
-    created_at: datetime
-    updated_at: datetime
-    closed_at: datetime
-    status: str
-    client: str
-    table: str  # (where client sit)
-
-
-# ==== ORDER LINE SCHEMAS ====
-class OrderLineCreate(BaseModel):
-    order: int
-    item: int
+    table_id: int
+    item_id: int
     quantity: float
-    discount_amount: float
-
-
-class OrderLineRead(BaseModel):
-    id: int
+    price: float
     created_at: datetime
-    order: int
-    item: int
+    model_config = ConfigDict(from_attributes=True)
+
+class OrderUpdate(BaseModel):
     quantity: float
-    uom: str  # (unit of measurement, e.g. 3 item, 500 ml, 200 gram)
-    price: float  # (fixed price at item ordering moment)
-    discount_amount: float  # (% -1:1)
-    final_price: float
+
+
+TableReadDetailed.model_rebuild()
+
+
+# ==== STATS SCHEMAS ====
+
+class ItemStat(BaseModel):
+    item_name: str
+    quantity: float
+    revenue: float
+
+class OrderLogEntry(BaseModel):
+    order_id: int
+    created_at: datetime
+    table_name: str
+    item_name: str
+    quantity: float
+    price: float
+    line_total: float
+
+class DailyStats(BaseModel):
+    date: str
+    revenue_total: float
+    revenue_locked: float   # from closed tables
+    revenue_running: float  # from still-active tables
+    orders_count: int
+    tables_served: int
+    items_sold: List[ItemStat]
+    orders_log: List[OrderLogEntry]

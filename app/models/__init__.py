@@ -6,7 +6,7 @@ from .models import (
     User,
     Item,
     Order,
-    OrderLine
+    Table
 )
 from sqlmodel import SQLModel
 
@@ -15,6 +15,6 @@ __all__ = [
     'User'
     'Item'
     'Order'
-    'OrderLine'
+    'Table'
     'SQLModel'
 ]
