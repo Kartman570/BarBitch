@@ -137,7 +137,7 @@ Manage the bar's item catalog.
 - Filter bar:
   - Search input: "Search items…" — filters list by name in real time (client-side)
   - Category dropdown: "All categories" + dynamically populated list from existing items
-  - Toggle: "Show unavailable" (default: off — only available items shown)
+  - Toggle: "Show unavailable" (default: on — only available items shown)
 - Items table below
 
 ### Items Table

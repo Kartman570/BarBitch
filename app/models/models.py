@@ -18,6 +18,7 @@ class Item(SQLModel, table=True):
     price: float
     category: str | None = Field(default=None)
     is_available: bool = Field(default=True)
+    stock_qty: float | None = Field(default=None)  # None = not tracked, >= 0 = current stock
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 

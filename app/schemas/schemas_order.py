@@ -26,6 +26,7 @@ class ItemCreate(BaseModel):
     price: float
     category: Optional[str] = None
     is_available: bool = True
+    stock_qty: Optional[float] = None
 
 class ItemRead(BaseModel):
     id: int
@@ -33,12 +34,17 @@ class ItemRead(BaseModel):
     price: float
     category: Optional[str]
     is_available: bool
+    stock_qty: Optional[float] = None
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
     category: Optional[str] = None
     is_available: Optional[bool] = None
+    stock_qty: Optional[float] = None
+
+class StockAdjust(BaseModel):
+    delta: float  # positive = add stock, negative = remove stock
 
 
 # ==== TABLE SCHEMAS ====

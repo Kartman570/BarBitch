@@ -7,7 +7,7 @@ from sqlmodel import select
 from models.models import User, Item, Order, Table
 from schemas.schemas_order import (
     UserCreate, UserRead, UserUpdate,
-    ItemCreate, ItemRead, ItemUpdate,
+    ItemCreate, ItemRead, ItemUpdate, StockAdjust,
     OrderCreate, OrderRead, OrderUpdate,
     TableCreate, TableRead, TableUpdate, TableReadDetailed,
     DailyStats,
@@ -131,6 +131,24 @@ def delete_item(item_id: int, session: SessionDep):
     return {"message": "Item deleted"}
 
 
+@router.patch("/items/{item_id}/stock", response_model=ItemRead, tags=["items"])
+def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep):
+    item = session.get(Item, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.stock_qty is None:
+        raise HTTPException(status_code=400, detail="Stock not tracked for this item")
+    new_qty = item.stock_qty + data.delta
+    if new_qty < 0:
+        raise HTTPException(status_code=400, detail="Insufficient stock")
+    item.stock_qty = new_qty
+    item.updated_at = datetime.now()
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    return item
+
+
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
 @router.post("/tables/", response_model=TableRead, tags=["tables"])
@@ -232,6 +250,25 @@ def update_order(table_id: int, order_id: int, data: OrderUpdate, session: Sessi
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Calculate quantity delta
+    quantity_delta = data.quantity - order.quantity
+
+    # Adjust stock if item has stock tracking
+    if quantity_delta != 0:
+        item = session.get(Item, order.item_id)
+        if item and item.stock_qty is not None:
+            # Quantity increased: deduct more stock
+            if quantity_delta > 0:
+                if item.stock_qty < quantity_delta:
+                    raise HTTPException(status_code=400, detail=f"Insufficient stock for {item.name}. Available: {item.stock_qty}, Need: {quantity_delta}")
+                item.stock_qty -= quantity_delta
+            # Quantity decreased: restore stock
+            else:
+                item.stock_qty -= quantity_delta  # subtract negative number = add
+            item.updated_at = datetime.now()
+            session.add(item)
+
     order.quantity = data.quantity
     session.add(order)
     session.commit()

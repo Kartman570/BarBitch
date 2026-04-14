@@ -67,6 +67,9 @@ def get_items(name=None, category=None, available_only=False):
         params["available_only"] = "true"
     return _req("GET", "/items/", params=params or None)
 
+def get_item(iid):
+    return _req("GET", f"/items/{iid}")
+
 def create_item(name, price, category, is_available):
     return _req("POST", "/items/", json={
         "name": name, "price": price,
@@ -78,6 +81,9 @@ def update_item(iid, **kw):
 
 def delete_item(iid):
     return _req("DELETE", f"/items/{iid}")
+
+def update_stock(iid, delta):
+    return _req("PATCH", f"/items/{iid}/stock", json={"delta": delta})
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

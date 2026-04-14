@@ -103,6 +103,15 @@ class TableService:
         item = self.session.get(Item, data.item_id)
         if item is None:
             raise LookupError(f"Item {data.item_id} not found")
+
+        # Check and deduct stock if tracked
+        if item.stock_qty is not None:
+            if item.stock_qty < data.quantity:
+                raise ValueError(f"Insufficient stock for {item.name}. Available: {item.stock_qty}, Requested: {data.quantity}")
+            item.stock_qty -= data.quantity
+            item.updated_at = datetime.now()
+            self.session.add(item)
+
         order = Order(
             table_id=table.id,
             item_id=data.item_id,

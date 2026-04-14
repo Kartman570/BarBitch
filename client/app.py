@@ -35,6 +35,9 @@ _init("edit_user", None)
 _init("confirm_del_user_id", None)
 # Stats
 _init("stats_date", None)  # None = today
+# Stock
+_init("stock_adjust_id", None)
+_init("stock_delta", 0.0)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -55,6 +58,8 @@ def nav_to(screen, table_id=None):
     ss.edit_user = None
     ss.confirm_del_user_id = None
     ss.stats_date = None
+    ss.stock_adjust_id = None
+    ss.stock_delta = 0.0
     st.rerun()
 
 
@@ -63,7 +68,7 @@ def nav_to(screen, table_id=None):
 with st.sidebar:
     st.markdown("## 🍺 BarBitch")
     st.divider()
-    for label, target in [("🗂 Tables", "tables"), ("🍹 Menu", "menu"), ("👥 Staff", "staff"), ("📊 Stats", "stats")]:
+    for label, target in [("🗂 Tables", "tables"), ("🍹 Menu", "menu"), ("📦 Stock", "stock"), ("👥 Staff", "staff"), ("📊 Stats", "stats")]:
         is_active = ss.screen == target or (ss.screen == "table_detail" and target == "tables")
         if st.button(label, use_container_width=True,
                      type="primary" if is_active else "secondary",
@@ -384,6 +389,12 @@ def table_detail():
                         if err:
                             st.error(err)
                         else:
+                            # Show confirmation including stock deduction if applicable
+                            item_detail, _ = api.get_item(it["id"])
+                            if item_detail and item_detail.get("stock_qty") is not None:
+                                st.success(f"✓ Added {qty} × {it['name']} | Stock: {item_detail['stock_qty']:.0f} left")
+                            else:
+                                st.success(f"✓ Added {qty} × {it['name']}")
                             ss.show_add_order = False
                             st.rerun()
 
@@ -415,6 +426,12 @@ def menu():
                                    placeholder="beer, cocktail, food, soft drink…", key="item_cat_in")
             avail_v = st.toggle("Available", value=d.get("is_available", True), key="item_avail_in")
 
+            stock_enabled = st.toggle("Track stock", value=d.get("stock_qty") is not None, key="item_stock_enabled_in")
+            stock_v = None
+            if stock_enabled:
+                stock_v = st.number_input("Stock quantity", value=float(d.get("stock_qty", 0) or 0),
+                                         min_value=0.0, step=1.0, format="%.0f", key="item_stock_in")
+
             s1, s2, _ = st.columns([1, 1, 3])
             with s1:
                 if st.button("Save", type="primary", use_container_width=True,
@@ -424,9 +441,13 @@ def menu():
                             ss.edit_item["id"],
                             name=name_v.strip(), price=price_v,
                             category=cat_v.strip() or None, is_available=avail_v,
+                            stock_qty=stock_v,
                         )
                     else:
                         _, err = api.create_item(name_v.strip(), price_v, cat_v.strip() or None, avail_v)
+                        if not err and stock_v is not None:
+                            item_id = _.get("id")
+                            _, err = api.update_item(item_id, stock_qty=stock_v)
                     if err:
                         st.error(err)
                     else:
@@ -471,7 +492,7 @@ def menu():
     cats = sorted({i["category"] for i in all_items if i.get("category")})
     cat_sel = f2.selectbox("Category", ["All categories"] + cats,
                             label_visibility="collapsed", key="menu_cat_sel")
-    show_unavail = f3.toggle("Show unavailable", key="menu_unavail_tog")
+    show_unavail = f3.toggle("Show unavailable", key="menu_unavail_tog", value=True)
 
     # Filter client-side
     items = all_items
@@ -621,6 +642,120 @@ def staff():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# STOCK
+# ══════════════════════════════════════════════════════════════════════════════
+
+def stock():
+    st.title("📦 Stock Management")
+
+    items, err = api.get_items()
+    if err:
+        st.error(err)
+        return
+
+    if not items:
+        st.info("No items to manage stock for.")
+        return
+
+    # Filter to items with stock tracking
+    tracked_items = [i for i in items if i.get("stock_qty") is not None]
+    untracked_items = [i for i in items if i.get("stock_qty") is None]
+
+    # Display tracked items
+    if tracked_items:
+        st.markdown("### Items with Stock")
+
+        hcols = st.columns([3, 2, 2, 3])
+        for hdr, col in zip(["Name", "Stock", "Category", "Actions"], hcols):
+            col.markdown(f"**{hdr}**")
+        st.divider()
+
+        for item in tracked_items:
+            rcols = st.columns([3, 2, 2, 3])
+
+            # Name
+            rcols[0].markdown(item["name"])
+
+            # Stock level
+            stock_val = item.get("stock_qty", 0)
+            color = "🟢" if stock_val > 0 else "🔴"
+            rcols[1].metric("", f"{color} {stock_val:.0f}")
+
+            # Category
+            rcols[2].markdown(item.get("category") or "—")
+
+            # Action buttons
+            with rcols[3]:
+                a1, a2, a3 = st.columns(3)
+
+                with a1:
+                    if st.button("−", key=f"remove_{item['id']}", use_container_width=True):
+                        _, err = api.update_stock(item["id"], -1)
+                        if err:
+                            st.error(err)
+                        else:
+                            st.success(f"Removed 1 from {item['name']}")
+                            st.rerun()
+
+                with a2:
+                    if st.button("+", key=f"add_{item['id']}", use_container_width=True, type="primary"):
+                        _, err = api.update_stock(item["id"], 1)
+                        if err:
+                            st.error(err)
+                        else:
+                            st.success(f"Added 1 to {item['name']}")
+                            st.rerun()
+
+                with a3:
+                    if st.button("Set", key=f"set_{item['id']}", use_container_width=True):
+                        ss.stock_adjust_id = item["id"]
+                        st.rerun()
+
+        # Set stock form
+        if ss.stock_adjust_id:
+            item = next((i for i in tracked_items if i["id"] == ss.stock_adjust_id), None)
+            if item:
+                with st.container(border=True):
+                    st.markdown(f"**Set stock for {item['name']}**")
+                    current = item.get("stock_qty", 0)
+                    new_qty = st.number_input(
+                        "New stock level",
+                        min_value=0.0,
+                        value=float(current),
+                        step=0.5,
+                        key="stock_set_input"
+                    )
+                    delta = new_qty - current
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Save", type="primary", use_container_width=True):
+                            if delta != 0:
+                                _, err = api.update_stock(item["id"], delta)
+                                if err:
+                                    st.error(err)
+                                else:
+                                    st.success(f"Updated stock to {new_qty:.0f}")
+                                    ss.stock_adjust_id = None
+                                    st.rerun()
+                            else:
+                                st.info("No change needed")
+                    with col2:
+                        if st.button("Cancel", use_container_width=True):
+                            ss.stock_adjust_id = None
+                            st.rerun()
+
+    # Show untracked items notice
+    if untracked_items:
+        st.divider()
+        st.markdown("### Items without Stock Tracking")
+        st.info(f"The following {len(untracked_items)} item(s) don't have stock tracking enabled. Edit them to enable stock tracking.")
+        with st.expander("Show untracked items"):
+            for item in untracked_items:
+                st.markdown(f"- {item['name']} (${item['price']:.2f})")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # STATS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -701,6 +836,8 @@ elif ss.screen == "tables":
     tables_board()
 elif ss.screen == "menu":
     menu()
+elif ss.screen == "stock":
+    stock()
 elif ss.screen == "staff":
     staff()
 elif ss.screen == "stats":
