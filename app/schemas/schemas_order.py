@@ -3,20 +3,60 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
+# ==== ROLE SCHEMAS ====
+
+class RoleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    permissions: List[str] = []
+
+class RoleRead(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    permissions: List[str]  # decoded from JSON
+
+class RoleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+
 # ==== USER SCHEMAS ====
 
 class UserCreate(BaseModel):
     name: str
-    role: str = "barman"
+    username: str
+    password: str
+    role_id: int
 
 class UserRead(BaseModel):
     id: int
     name: str
-    role: str
+    username: Optional[str]
+    role_id: Optional[int]
+    role_name: Optional[str] = None
+    permissions: List[str] = []
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None  # plain text, will be hashed
+    role_id: Optional[int] = None
+
+
+# ==== AUTH SCHEMAS ====
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    role_name: str
+    permissions: List[str]
 
 
 # ==== ITEM SCHEMAS ====
@@ -26,6 +66,7 @@ class ItemCreate(BaseModel):
     price: float
     category: Optional[str] = None
     is_available: bool = True
+    stock_qty: Optional[float] = None
 
 class ItemRead(BaseModel):
     id: int
@@ -33,12 +74,17 @@ class ItemRead(BaseModel):
     price: float
     category: Optional[str]
     is_available: bool
+    stock_qty: Optional[float] = None
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
     category: Optional[str] = None
     is_available: Optional[bool] = None
+    stock_qty: Optional[float] = None
+
+class StockAdjust(BaseModel):
+    delta: float  # positive = add stock, negative = remove stock
 
 
 # ==== TABLE SCHEMAS ====

@@ -1,8 +1,16 @@
+import json
+import uuid
 import streamlit as st
 from datetime import datetime, date
 import api
 
 st.set_page_config(page_title="BarBitch", layout="wide", initial_sidebar_state="expanded")
+
+
+@st.cache_resource
+def _session_store():
+    """Server-side token → user dict. Survives Streamlit reruns within the process."""
+    return {}
 
 ss = st.session_state
 
@@ -13,8 +21,10 @@ def _init(key, val):
     if key not in ss:
         ss[key] = val
 
+# Auth
+_init("user", None)            # None = not logged in; dict with id, name, permissions, etc.
 # Navigation
-_init("screen", "tables")      # tables | table_detail | menu | staff
+_init("screen", "tables")      # tables | table_detail | menu | staff | roles
 _init("table_id", None)
 # Tables board
 _init("show_open_form", False)
@@ -33,8 +43,15 @@ _init("confirm_del_item_id", None)
 _init("show_user_form", False)
 _init("edit_user", None)
 _init("confirm_del_user_id", None)
+# Roles
+_init("show_role_form", False)
+_init("edit_role", None)
+_init("confirm_del_role_id", None)
 # Stats
 _init("stats_date", None)  # None = today
+# Stock
+_init("stock_adjust_id", None)
+_init("stock_delta", 0.0)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -54,21 +71,97 @@ def nav_to(screen, table_id=None):
     ss.show_user_form = False
     ss.edit_user = None
     ss.confirm_del_user_id = None
+    ss.show_role_form = False
+    ss.edit_role = None
+    ss.confirm_del_role_id = None
     ss.stats_date = None
+    ss.stock_adjust_id = None
+    ss.stock_delta = 0.0
     st.rerun()
 
+
+def has_perm(perm: str) -> bool:
+    return perm in (ss.user or {}).get("permissions", [])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGIN SCREEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+def login_screen():
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        st.markdown("## 🍺 BarBitch")
+        st.markdown("### Sign in")
+        with st.container(border=True):
+            username = st.text_input("Username", key="login_username")
+            password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Sign in", type="primary", use_container_width=True):
+                if username and password:
+                    data, err = api.login(username, password)
+                    if err:
+                        st.error(err)
+                    else:
+                        token = str(uuid.uuid4())
+                        _session_store()[token] = data
+                        st.query_params["t"] = token
+                        ss.user = data
+                        st.rerun()
+                else:
+                    st.warning("Enter username and password.")
+
+
+if ss.user is None:
+    token = st.query_params.get("t")
+    if token:
+        ss.user = _session_store().get(token)
+
+if ss.user is None:
+    login_screen()
+    st.stop()
+
+_NAV_ITEMS = [
+    ("🗂 Tables",  "tables", "tables"),
+    ("🍹 Menu",    "menu",   "items"),
+    ("📦 Stock",   "stock",  "stock"),
+    ("👥 Staff",   "staff",  "users"),
+    ("🔑 Roles",   "roles",  "roles"),
+    ("📊 Stats",   "stats",  "stats"),
+]
+
+# Redirect to first permitted screen if current screen is inaccessible
+_screen_perms = {"tables": "tables", "table_detail": "tables", "menu": "items",
+                 "stock": "stock", "staff": "users", "roles": "roles", "stats": "stats"}
+if not has_perm(_screen_perms.get(ss.screen, "")):
+    _first = next((target for _, target, perm in _NAV_ITEMS if has_perm(perm)), None)
+    if _first and ss.screen != _first:
+        ss.screen = _first
+        st.rerun()
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.markdown("## 🍺 BarBitch")
     st.divider()
-    for label, target in [("🗂 Tables", "tables"), ("🍹 Menu", "menu"), ("👥 Staff", "staff"), ("📊 Stats", "stats")]:
+    for label, target, perm in _NAV_ITEMS:
+        if not has_perm(perm):
+            continue
         is_active = ss.screen == target or (ss.screen == "table_detail" and target == "tables")
         if st.button(label, use_container_width=True,
                      type="primary" if is_active else "secondary",
                      key=f"nav_{target}"):
             nav_to(target)
+    st.divider()
+    st.caption(f"Signed in as **{ss.user['name']}**")
+    st.caption(f"Role: {ss.user['role_name']}")
+    if st.button("Sign out", use_container_width=True, key="nav_logout"):
+        token = st.query_params.get("t")
+        if token:
+            _session_store().pop(token, None)
+        st.query_params.clear()
+        ss.user = None
+        st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -316,7 +409,7 @@ def table_detail():
                     return _cb
 
                 rc[2].number_input(
-                    "", min_value=0.5, step=0.5,
+                    "Qty", min_value=0.5, step=0.5,
                     value=float(order["quantity"]),
                     key=f"qty_{order['id']}",
                     label_visibility="collapsed",
@@ -384,6 +477,12 @@ def table_detail():
                         if err:
                             st.error(err)
                         else:
+                            # Show confirmation including stock deduction if applicable
+                            item_detail, _ = api.get_item(it["id"])
+                            if item_detail and item_detail.get("stock_qty") is not None:
+                                st.success(f"✓ Added {qty} × {it['name']} | Stock: {item_detail['stock_qty']:.0f} left")
+                            else:
+                                st.success(f"✓ Added {qty} × {it['name']}")
                             ss.show_add_order = False
                             st.rerun()
 
@@ -415,6 +514,12 @@ def menu():
                                    placeholder="beer, cocktail, food, soft drink…", key="item_cat_in")
             avail_v = st.toggle("Available", value=d.get("is_available", True), key="item_avail_in")
 
+            stock_enabled = st.toggle("Track stock", value=d.get("stock_qty") is not None, key="item_stock_enabled_in")
+            stock_v = None
+            if stock_enabled:
+                stock_v = st.number_input("Stock quantity", value=float(d.get("stock_qty", 0) or 0),
+                                         min_value=0.0, step=1.0, format="%.0f", key="item_stock_in")
+
             s1, s2, _ = st.columns([1, 1, 3])
             with s1:
                 if st.button("Save", type="primary", use_container_width=True,
@@ -424,9 +529,13 @@ def menu():
                             ss.edit_item["id"],
                             name=name_v.strip(), price=price_v,
                             category=cat_v.strip() or None, is_available=avail_v,
+                            stock_qty=stock_v,
                         )
                     else:
                         _, err = api.create_item(name_v.strip(), price_v, cat_v.strip() or None, avail_v)
+                        if not err and stock_v is not None:
+                            item_id = _.get("id")
+                            _, err = api.update_item(item_id, stock_qty=stock_v)
                     if err:
                         st.error(err)
                     else:
@@ -471,7 +580,7 @@ def menu():
     cats = sorted({i["category"] for i in all_items if i.get("category")})
     cat_sel = f2.selectbox("Category", ["All categories"] + cats,
                             label_visibility="collapsed", key="menu_cat_sel")
-    show_unavail = f3.toggle("Show unavailable", key="menu_unavail_tog")
+    show_unavail = f3.toggle("Show unavailable", key="menu_unavail_tog", value=True)
 
     # Filter client-side
     items = all_items
@@ -527,10 +636,6 @@ def menu():
 # STAFF
 # ══════════════════════════════════════════════════════════════════════════════
 
-ROLE_EMOJI = {"admin": "🔵", "barman": "🟢", "cook": "🟠"}
-ROLES = ["barman", "cook", "admin"]
-
-
 def staff():
     col_h, col_btn = st.columns([4, 1])
     col_h.title("Staff")
@@ -541,6 +646,15 @@ def staff():
             ss.edit_user = None
             st.rerun()
 
+    roles_data, roles_err = api.get_roles()
+    if roles_err:
+        st.error(f"Could not load roles: {roles_err}")
+        return
+    roles_list = roles_data or []
+    role_map = {r["id"]: r for r in roles_list}
+    role_options = [r["name"] for r in roles_list]
+    role_ids = [r["id"] for r in roles_list]
+
     # Add / Edit form
     if ss.show_user_form:
         editing = ss.edit_user is not None
@@ -548,17 +662,36 @@ def staff():
             st.markdown(f"**{'Edit' if editing else 'New'} Staff Member**")
             d = ss.edit_user or {}
             name_v = st.text_input("Name", value=d.get("name", ""), max_chars=50, key="user_name_in")
-            role_v = st.selectbox("Role", ROLES,
-                                   index=ROLES.index(d.get("role", "barman")),
-                                   key="user_role_in")
+            username_v = st.text_input("Username", value=d.get("username", ""), max_chars=50, key="user_username_in")
+            password_v = st.text_input(
+                "Password" + (" (leave blank to keep)" if editing else ""),
+                type="password", key="user_password_in"
+            )
+            # Role selector
+            cur_role_id = d.get("role_id")
+            cur_role_idx = role_ids.index(cur_role_id) if cur_role_id in role_ids else 0
+            role_sel_idx = st.selectbox(
+                "Role", range(len(role_options)),
+                format_func=lambda i: role_options[i],
+                index=cur_role_idx,
+                key="user_role_in",
+            )
+            selected_role_id = role_ids[role_sel_idx]
+
             s1, s2, _ = st.columns([1, 1, 3])
             with s1:
+                can_save = bool((name_v or "").strip()) and bool((username_v or "").strip())
+                if not editing:
+                    can_save = can_save and bool((password_v or "").strip())
                 if st.button("Save", type="primary", use_container_width=True,
-                             disabled=not (name_v or "").strip(), key="save_user_btn"):
+                             disabled=not can_save, key="save_user_btn"):
                     if editing:
-                        _, err = api.update_user(ss.edit_user["id"], name=name_v.strip(), role=role_v)
+                        kw = {"name": name_v.strip(), "username": username_v.strip(), "role_id": selected_role_id}
+                        if password_v.strip():
+                            kw["password"] = password_v.strip()
+                        _, err = api.update_user(ss.edit_user["id"], **kw)
                     else:
-                        _, err = api.create_user(name_v.strip(), role_v)
+                        _, err = api.create_user(name_v.strip(), username_v.strip(), password_v.strip(), selected_role_id)
                     if err:
                         st.error(err)
                     else:
@@ -599,17 +732,17 @@ def staff():
         st.info("No staff members yet.")
         return
 
-    hcols = st.columns([4, 3, 3])
-    for hdr, col in zip(["Name", "Role", "Actions"], hcols):
+    hcols = st.columns([3, 2, 3, 3])
+    for hdr, col in zip(["Name", "Username", "Role", "Actions"], hcols):
         col.markdown(f"**{hdr}**")
     st.divider()
 
     for user in users:
-        rc = st.columns([4, 3, 3])
+        rc = st.columns([3, 2, 3, 3])
         rc[0].markdown(user["name"])
-        emoji = ROLE_EMOJI.get(user["role"], "⚪")
-        rc[1].markdown(f"{emoji} {user['role'].capitalize()}")
-        with rc[2]:
+        rc[1].markdown(user.get("username") or "—")
+        rc[2].markdown(user.get("role_name") or "—")
+        with rc[3]:
             a1, a2 = st.columns(2)
             if a1.button("Edit", key=f"edit_user_{user['id']}", use_container_width=True):
                 ss.show_user_form = True
@@ -618,6 +751,234 @@ def staff():
             if a2.button("Del", key=f"del_user_{user['id']}", use_container_width=True):
                 ss.confirm_del_user_id = user["id"]
                 st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ROLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+ALL_PERMS = ["tables", "items", "stock", "stats", "users", "roles"]
+PERM_LABELS = {
+    "tables": "🗂 Tables — manage tables & orders",
+    "items":  "🍹 Items — view & edit menu",
+    "stock":  "📦 Stock — view & adjust stock",
+    "stats":  "📊 Stats — view daily statistics",
+    "users":  "👥 Users — manage staff accounts",
+    "roles":  "🔑 Roles — manage roles & permissions",
+}
+
+
+def roles():
+    col_h, col_btn = st.columns([4, 1])
+    col_h.title("Roles")
+    with col_btn:
+        st.write("")
+        if st.button("➕ Add Role", use_container_width=True, type="primary"):
+            ss.show_role_form = True
+            ss.edit_role = None
+            st.rerun()
+
+    # Add / Edit form
+    if ss.show_role_form:
+        editing = ss.edit_role is not None
+        with st.container(border=True):
+            st.markdown(f"**{'Edit' if editing else 'New'} Role**")
+            d = ss.edit_role or {}
+            name_v = st.text_input("Role name", value=d.get("name", ""), max_chars=50, key="role_name_in")
+            desc_v = st.text_input("Description", value=d.get("description") or "", key="role_desc_in")
+            cur_perms = d.get("permissions", [])
+            selected_perms = []
+            st.markdown("**Permissions**")
+            for perm in ALL_PERMS:
+                checked = st.checkbox(PERM_LABELS[perm], value=(perm in cur_perms), key=f"perm_{perm}_in")
+                if checked:
+                    selected_perms.append(perm)
+
+            s1, s2, _ = st.columns([1, 1, 3])
+            with s1:
+                if st.button("Save", type="primary", use_container_width=True,
+                             disabled=not (name_v or "").strip(), key="save_role_btn"):
+                    if editing:
+                        _, err = api.update_role(ss.edit_role["id"],
+                                                  name=name_v.strip(),
+                                                  description=desc_v.strip() or None,
+                                                  permissions=selected_perms)
+                    else:
+                        _, err = api.create_role(name_v.strip(), desc_v.strip() or None, selected_perms)
+                    if err:
+                        st.error(err)
+                    else:
+                        ss.show_role_form = False
+                        ss.edit_role = None
+                        st.rerun()
+            with s2:
+                if st.button("Cancel", use_container_width=True, key="cancel_role_frm"):
+                    ss.show_role_form = False
+                    ss.edit_role = None
+                    st.rerun()
+
+    # Delete confirmation
+    if ss.confirm_del_role_id:
+        roles_chk, _ = api.get_roles()
+        role_chk = next((r for r in (roles_chk or []) if r["id"] == ss.confirm_del_role_id), None)
+        if role_chk:
+            with st.container(border=True):
+                st.warning(f"Delete role **{role_chk['name']}**? This cannot be undone.", icon="⚠️")
+                c1, c2, _ = st.columns([1, 1, 3])
+                with c1:
+                    if st.button("Delete", type="primary", use_container_width=True, key="confirm_del_role_btn"):
+                        _, err = api.delete_role(ss.confirm_del_role_id)
+                        if err:
+                            st.error(err)
+                        ss.confirm_del_role_id = None
+                        st.rerun()
+                with c2:
+                    if st.button("Cancel", use_container_width=True, key="cancel_del_role_btn"):
+                        ss.confirm_del_role_id = None
+                        st.rerun()
+
+    roles_data, err = api.get_roles()
+    if err:
+        st.error(err)
+        return
+    if not roles_data:
+        st.info("No roles defined.")
+        return
+
+    hcols = st.columns([2, 3, 4, 2])
+    for hdr, col in zip(["Name", "Description", "Permissions", "Actions"], hcols):
+        col.markdown(f"**{hdr}**")
+    st.divider()
+
+    for role in roles_data:
+        rc = st.columns([2, 3, 4, 2])
+        rc[0].markdown(f"**{role['name']}**")
+        rc[1].markdown(role.get("description") or "—")
+        perm_badges = " · ".join(role["permissions"]) if role["permissions"] else "—"
+        rc[2].markdown(perm_badges)
+        with rc[3]:
+            a1, a2 = st.columns(2)
+            if a1.button("Edit", key=f"edit_role_{role['id']}", use_container_width=True):
+                ss.show_role_form = True
+                ss.edit_role = role
+                st.rerun()
+            if a2.button("Del", key=f"del_role_{role['id']}", use_container_width=True):
+                ss.confirm_del_role_id = role["id"]
+                st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STOCK
+# ══════════════════════════════════════════════════════════════════════════════
+
+def stock():
+    st.title("📦 Stock Management")
+
+    items, err = api.get_items()
+    if err:
+        st.error(err)
+        return
+
+    if not items:
+        st.info("No items to manage stock for.")
+        return
+
+    # Filter to items with stock tracking
+    tracked_items = [i for i in items if i.get("stock_qty") is not None]
+    untracked_items = [i for i in items if i.get("stock_qty") is None]
+
+    # Display tracked items
+    if tracked_items:
+        st.markdown("### Items with Stock")
+
+        hcols = st.columns([3, 2, 2, 3])
+        for hdr, col in zip(["Name", "Stock", "Category", "Actions"], hcols):
+            col.markdown(f"**{hdr}**")
+        st.divider()
+
+        for item in tracked_items:
+            rcols = st.columns([3, 2, 2, 3])
+
+            # Name
+            rcols[0].markdown(item["name"])
+
+            # Stock level
+            stock_val = item.get("stock_qty", 0)
+            color = "🟢" if stock_val > 0 else "🔴"
+            rcols[1].metric("", f"{color} {stock_val:.0f}")
+
+            # Category
+            rcols[2].markdown(item.get("category") or "—")
+
+            # Action buttons
+            with rcols[3]:
+                a1, a2, a3 = st.columns(3)
+
+                with a1:
+                    if st.button("−", key=f"remove_{item['id']}", use_container_width=True):
+                        _, err = api.update_stock(item["id"], -1)
+                        if err:
+                            st.error(err)
+                        else:
+                            st.success(f"Removed 1 from {item['name']}")
+                            st.rerun()
+
+                with a2:
+                    if st.button("+", key=f"add_{item['id']}", use_container_width=True, type="primary"):
+                        _, err = api.update_stock(item["id"], 1)
+                        if err:
+                            st.error(err)
+                        else:
+                            st.success(f"Added 1 to {item['name']}")
+                            st.rerun()
+
+                with a3:
+                    if st.button("Set", key=f"set_{item['id']}", use_container_width=True):
+                        ss.stock_adjust_id = item["id"]
+                        st.rerun()
+
+        # Set stock form
+        if ss.stock_adjust_id:
+            item = next((i for i in tracked_items if i["id"] == ss.stock_adjust_id), None)
+            if item:
+                with st.container(border=True):
+                    st.markdown(f"**Set stock for {item['name']}**")
+                    current = item.get("stock_qty", 0)
+                    new_qty = st.number_input(
+                        "New stock level",
+                        min_value=0.0,
+                        value=float(current),
+                        step=0.5,
+                        key="stock_set_input"
+                    )
+                    delta = new_qty - current
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Save", type="primary", use_container_width=True):
+                            if delta != 0:
+                                _, err = api.update_stock(item["id"], delta)
+                                if err:
+                                    st.error(err)
+                                else:
+                                    st.success(f"Updated stock to {new_qty:.0f}")
+                                    ss.stock_adjust_id = None
+                                    st.rerun()
+                            else:
+                                st.info("No change needed")
+                    with col2:
+                        if st.button("Cancel", use_container_width=True):
+                            ss.stock_adjust_id = None
+                            st.rerun()
+
+    # Show untracked items notice
+    if untracked_items:
+        st.divider()
+        st.markdown("### Items without Stock Tracking")
+        st.info(f"The following {len(untracked_items)} item(s) don't have stock tracking enabled. Edit them to enable stock tracking.")
+        with st.expander("Show untracked items"):
+            for item in untracked_items:
+                st.markdown(f"- {item['name']} (${item['price']:.2f})")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -695,13 +1056,41 @@ def stats():
 
 # ── Router ─────────────────────────────────────────────────────────────────────
 
+def _access_denied():
+    st.error("You don't have permission to view this page.")
+
 if ss.screen == "table_detail":
-    table_detail()
+    if has_perm("tables"):
+        table_detail()
+    else:
+        _access_denied()
 elif ss.screen == "tables":
-    tables_board()
+    if has_perm("tables"):
+        tables_board()
+    else:
+        _access_denied()
 elif ss.screen == "menu":
-    menu()
+    if has_perm("items"):
+        menu()
+    else:
+        _access_denied()
+elif ss.screen == "stock":
+    if has_perm("stock"):
+        stock()
+    else:
+        _access_denied()
 elif ss.screen == "staff":
-    staff()
+    if has_perm("users"):
+        staff()
+    else:
+        _access_denied()
+elif ss.screen == "roles":
+    if has_perm("roles"):
+        roles()
+    else:
+        _access_denied()
 elif ss.screen == "stats":
-    stats()
+    if has_perm("stats"):
+        stats()
+    else:
+        _access_denied()

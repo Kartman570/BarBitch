@@ -61,27 +61,43 @@ class TestItems:
 
 
 class TestUsers:
+    def _make_role(self, client, name="barman"):
+        """Create a role and return its id."""
+        r = client.post(f"{BASE}/roles/", json={"name": name, "permissions": ["tables"]})
+        return r.json()["id"]
+
     def test_create_and_read(self, client):
-        r = client.post(f"{BASE}/users/", json={"name": "Alice", "role": "barman"})
+        role_id = self._make_role(client)
+        r = client.post(f"{BASE}/users/", json={
+            "name": "Alice", "username": "alice", "password": "pass", "role_id": role_id
+        })
         assert r.status_code == 200
         data = r.json()
         assert data["name"] == "Alice"
-        assert data["role"] == "barman"
+        assert data["username"] == "alice"
+        assert data["role_name"] == "barman"
         user_id = data["id"]
 
         r = client.get(f"{BASE}/users/{user_id}")
         assert r.status_code == 200
 
     def test_update_user(self, client):
-        r = client.post(f"{BASE}/users/", json={"name": "Bob"})
+        role_id = self._make_role(client, "barman")
+        r = client.post(f"{BASE}/users/", json={
+            "name": "Bob", "username": "bob", "password": "pass", "role_id": role_id
+        })
         user_id = r.json()["id"]
 
-        r = client.put(f"{BASE}/users/{user_id}", json={"role": "admin"})
+        admin_role_id = self._make_role(client, "admin2")
+        r = client.put(f"{BASE}/users/{user_id}", json={"role_id": admin_role_id})
         assert r.status_code == 200
-        assert r.json()["role"] == "admin"
+        assert r.json()["role_id"] == admin_role_id
 
     def test_delete_user(self, client):
-        r = client.post(f"{BASE}/users/", json={"name": "Carol"})
+        role_id = self._make_role(client, "cook")
+        r = client.post(f"{BASE}/users/", json={
+            "name": "Carol", "username": "carol", "password": "pass", "role_id": role_id
+        })
         user_id = r.json()["id"]
         assert client.delete(f"{BASE}/users/{user_id}").status_code == 200
         assert client.get(f"{BASE}/users/{user_id}").status_code == 404

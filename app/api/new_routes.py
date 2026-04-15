@@ -4,29 +4,156 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import select
 
-from models.models import User, Item, Order, Table
+from models.models import User, Item, Order, Table, Role
 from schemas.schemas_order import (
+    RoleCreate, RoleRead, RoleUpdate,
     UserCreate, UserRead, UserUpdate,
-    ItemCreate, ItemRead, ItemUpdate,
+    LoginRequest, LoginResponse,
+    ItemCreate, ItemRead, ItemUpdate, StockAdjust,
     OrderCreate, OrderRead, OrderUpdate,
     TableCreate, TableRead, TableUpdate, TableReadDetailed,
     DailyStats,
 )
 from core.database import SessionDep
 from services.table_service import TableService
+from services.auth_service import (
+    hash_password, verify_password,
+    encode_permissions, decode_permissions,
+    ALL_PERMISSIONS,
+)
 
 router = APIRouter()
 
 
+# ── Auth ───────────────────────────────────────────────────────────────────────
+
+@router.post("/auth/login", response_model=LoginResponse, tags=["auth"])
+def login(data: LoginRequest, session: SessionDep):
+    user = session.exec(select(User).where(User.username == data.username)).first()
+    if user is None or user.password_hash is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    role = session.get(Role, user.role_id) if user.role_id else None
+    permissions = decode_permissions(role.permissions) if role else []
+    return LoginResponse(
+        id=user.id,
+        name=user.name,
+        username=user.username,
+        role_name=role.name if role else "",
+        permissions=permissions,
+    )
+
+
+# ── Roles ──────────────────────────────────────────────────────────────────────
+
+def _role_to_read(role: Role) -> RoleRead:
+    return RoleRead(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        permissions=decode_permissions(role.permissions),
+    )
+
+
+@router.post("/roles/", response_model=RoleRead, tags=["roles"])
+def create_role(data: RoleCreate, session: SessionDep):
+    invalid = set(data.permissions) - ALL_PERMISSIONS
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Unknown permissions: {sorted(invalid)}")
+    existing = session.exec(select(Role).where(Role.name == data.name)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Role '{data.name}' already exists")
+    role = Role(
+        name=data.name,
+        description=data.description,
+        permissions=encode_permissions(data.permissions),
+    )
+    session.add(role)
+    session.commit()
+    session.refresh(role)
+    return _role_to_read(role)
+
+
+@router.get("/roles/", response_model=list[RoleRead], tags=["roles"])
+def list_roles(session: SessionDep):
+    roles = session.exec(select(Role)).all()
+    return [_role_to_read(r) for r in roles]
+
+
+@router.get("/roles/{role_id}", response_model=RoleRead, tags=["roles"])
+def get_role(role_id: int, session: SessionDep):
+    role = session.get(Role, role_id)
+    if role is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return _role_to_read(role)
+
+
+@router.patch("/roles/{role_id}", response_model=RoleRead, tags=["roles"])
+def update_role(role_id: int, data: RoleUpdate, session: SessionDep):
+    role = session.get(Role, role_id)
+    if role is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if data.name is not None:
+        role.name = data.name
+    if data.description is not None:
+        role.description = data.description
+    if data.permissions is not None:
+        invalid = set(data.permissions) - ALL_PERMISSIONS
+        if invalid:
+            raise HTTPException(status_code=400, detail=f"Unknown permissions: {sorted(invalid)}")
+        role.permissions = encode_permissions(data.permissions)
+    session.add(role)
+    session.commit()
+    session.refresh(role)
+    return _role_to_read(role)
+
+
+@router.delete("/roles/{role_id}", tags=["roles"])
+def delete_role(role_id: int, session: SessionDep):
+    role = session.get(Role, role_id)
+    if role is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if role.name == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete the built-in admin role")
+    assigned = session.exec(select(User).where(User.role_id == role_id)).first()
+    if assigned:
+        raise HTTPException(status_code=400, detail="Cannot delete role with assigned users")
+    session.delete(role)
+    session.commit()
+    return {"message": "Role deleted"}
+
+
 # ── Users ──────────────────────────────────────────────────────────────────────
+
+def _user_to_read(user: User, session) -> UserRead:
+    role = session.get(Role, user.role_id) if user.role_id else None
+    return UserRead(
+        id=user.id,
+        name=user.name,
+        username=user.username,
+        role_id=user.role_id,
+        role_name=role.name if role else None,
+        permissions=decode_permissions(role.permissions) if role else [],
+    )
+
 
 @router.post("/users/", response_model=UserRead, tags=["users"])
 def create_user(data: UserCreate, session: SessionDep):
-    user = User(**data.model_dump())
+    if session.exec(select(User).where(User.username == data.username)).first():
+        raise HTTPException(status_code=400, detail=f"Username '{data.username}' already taken")
+    if session.get(Role, data.role_id) is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    user = User(
+        name=data.name,
+        username=data.username,
+        password_hash=hash_password(data.password),
+        role_id=data.role_id,
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
-    return user
+    return _user_to_read(user, session)
 
 
 @router.get("/users/", response_model=list[UserRead], tags=["users"])
@@ -37,7 +164,8 @@ def list_users(
     q = select(User)
     if name:
         q = q.where(User.name.ilike(f"%{name}%"))
-    return session.exec(q).all()
+    users = session.exec(q).all()
+    return [_user_to_read(u, session) for u in users]
 
 
 @router.get("/users/{user_id}", response_model=UserRead, tags=["users"])
@@ -45,7 +173,7 @@ def get_user(user_id: int, session: SessionDep):
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _user_to_read(user, session)
 
 
 @router.put("/users/{user_id}", response_model=UserRead, tags=["users"])
@@ -53,12 +181,23 @@ def update_user(user_id: int, data: UserUpdate, session: SessionDep):
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(user, field, value)
+    if data.name is not None:
+        user.name = data.name
+    if data.username is not None:
+        existing = session.exec(select(User).where(User.username == data.username)).first()
+        if existing and existing.id != user_id:
+            raise HTTPException(status_code=400, detail=f"Username '{data.username}' already taken")
+        user.username = data.username
+    if data.password is not None:
+        user.password_hash = hash_password(data.password)
+    if data.role_id is not None:
+        if session.get(Role, data.role_id) is None:
+            raise HTTPException(status_code=404, detail="Role not found")
+        user.role_id = data.role_id
     session.add(user)
     session.commit()
     session.refresh(user)
-    return user
+    return _user_to_read(user, session)
 
 
 @router.delete("/users/{user_id}", tags=["users"])
@@ -129,6 +268,24 @@ def delete_item(item_id: int, session: SessionDep):
     session.delete(item)
     session.commit()
     return {"message": "Item deleted"}
+
+
+@router.patch("/items/{item_id}/stock", response_model=ItemRead, tags=["items"])
+def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep):
+    item = session.get(Item, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.stock_qty is None:
+        raise HTTPException(status_code=400, detail="Stock not tracked for this item")
+    new_qty = item.stock_qty + data.delta
+    if new_qty < 0:
+        raise HTTPException(status_code=400, detail="Insufficient stock")
+    item.stock_qty = new_qty
+    item.updated_at = datetime.now()
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    return item
 
 
 # ── Tables ─────────────────────────────────────────────────────────────────────
@@ -232,6 +389,25 @@ def update_order(table_id: int, order_id: int, data: OrderUpdate, session: Sessi
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Calculate quantity delta
+    quantity_delta = data.quantity - order.quantity
+
+    # Adjust stock if item has stock tracking
+    if quantity_delta != 0:
+        item = session.get(Item, order.item_id)
+        if item and item.stock_qty is not None:
+            # Quantity increased: deduct more stock
+            if quantity_delta > 0:
+                if item.stock_qty < quantity_delta:
+                    raise HTTPException(status_code=400, detail=f"Insufficient stock for {item.name}. Available: {item.stock_qty}, Need: {quantity_delta}")
+                item.stock_qty -= quantity_delta
+            # Quantity decreased: restore stock
+            else:
+                item.stock_qty -= quantity_delta  # subtract negative number = add
+            item.updated_at = datetime.now()
+            session.add(item)
+
     order.quantity = data.quantity
     session.add(order)
     session.commit()

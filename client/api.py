@@ -21,6 +21,29 @@ def _req(method, path, **kwargs):
         return None, str(e)
 
 
+# ── Auth ───────────────────────────────────────────────────────────────────────
+
+def login(username, password):
+    return _req("POST", "/auth/login", json={"username": username, "password": password})
+
+
+# ── Roles ──────────────────────────────────────────────────────────────────────
+
+def get_roles():
+    return _req("GET", "/roles/")
+
+def create_role(name, description, permissions):
+    return _req("POST", "/roles/", json={
+        "name": name, "description": description or None, "permissions": permissions
+    })
+
+def update_role(rid, **kw):
+    return _req("PATCH", f"/roles/{rid}", json=kw)
+
+def delete_role(rid):
+    return _req("DELETE", f"/roles/{rid}")
+
+
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
 def get_tables(status=None):
@@ -67,17 +90,23 @@ def get_items(name=None, category=None, available_only=False):
         params["available_only"] = "true"
     return _req("GET", "/items/", params=params or None)
 
-def create_item(name, price, category, is_available):
-    return _req("POST", "/items/", json={
-        "name": name, "price": price,
-        "category": category or None, "is_available": is_available,
-    })
+def get_item(iid):
+    return _req("GET", f"/items/{iid}")
+
+def create_item(name, price, category, is_available, stock_qty=None):
+    body = {"name": name, "price": price, "category": category or None, "is_available": is_available}
+    if stock_qty is not None:
+        body["stock_qty"] = stock_qty
+    return _req("POST", "/items/", json=body)
 
 def update_item(iid, **kw):
     return _req("PUT", f"/items/{iid}", json=kw)
 
 def delete_item(iid):
     return _req("DELETE", f"/items/{iid}")
+
+def update_stock(iid, delta):
+    return _req("PATCH", f"/items/{iid}/stock", json={"delta": delta})
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -92,8 +121,10 @@ def get_daily_stats(date_str=None):
 def get_users():
     return _req("GET", "/users/")
 
-def create_user(name, role):
-    return _req("POST", "/users/", json={"name": name, "role": role})
+def create_user(name, username, password, role_id):
+    return _req("POST", "/users/", json={
+        "name": name, "username": username, "password": password, "role_id": role_id
+    })
 
 def update_user(uid, **kw):
     return _req("PUT", f"/users/{uid}", json=kw)
