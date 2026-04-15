@@ -3,20 +3,60 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
+# ==== ROLE SCHEMAS ====
+
+class RoleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    permissions: List[str] = []
+
+class RoleRead(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    permissions: List[str]  # decoded from JSON
+
+class RoleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+
 # ==== USER SCHEMAS ====
 
 class UserCreate(BaseModel):
     name: str
-    role: str = "barman"
+    username: str
+    password: str
+    role_id: int
 
 class UserRead(BaseModel):
     id: int
     name: str
-    role: str
+    username: Optional[str]
+    role_id: Optional[int]
+    role_name: Optional[str] = None
+    permissions: List[str] = []
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None  # plain text, will be hashed
+    role_id: Optional[int] = None
+
+
+# ==== AUTH SCHEMAS ====
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    role_name: str
+    permissions: List[str]
 
 
 # ==== ITEM SCHEMAS ====

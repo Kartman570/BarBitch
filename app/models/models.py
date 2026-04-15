@@ -4,11 +4,26 @@ from datetime import datetime
 from sqlmodel import Field, SQLModel, Relationship
 
 
+class Role(SQLModel, table=True):
+    __tablename__ = "roles"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, max_length=50)
+    description: str | None = Field(default=None)
+    # JSON-encoded list of permission strings, e.g. '["tables","stock"]'
+    permissions: str = Field(default="[]")
+
+    users: List["User"] = Relationship(back_populates="role")
+
+
 class User(SQLModel, table=True):
     __tablename__ = "users"
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(max_length=50)
-    role: str = Field(default="barman")  # admin | barman | cook
+    username: str | None = Field(default=None, unique=True, max_length=50)
+    password_hash: str | None = Field(default=None)
+    role_id: int | None = Field(default=None, foreign_key="roles.id")
+
+    role: Role | None = Relationship(back_populates="users")
 
 
 class Item(SQLModel, table=True):
