@@ -49,6 +49,9 @@ _init("edit_role", None)
 _init("confirm_del_role_id", None)
 # Stats
 _init("stats_date", None)  # None = today
+# Tables — closed date filter
+_init("closed_date_filter", None)   # None = show all dates
+_init("date_filter_enabled", True)  # True = filter active
 # Stock
 _init("stock_adjust_id", None)
 _init("stock_delta", 0.0)
@@ -103,6 +106,7 @@ def login_screen():
                     if err:
                         st.error(err)
                     else:
+                        api.set_token(data["access_token"])
                         token = str(uuid.uuid4())
                         _session_store()[token] = data
                         st.query_params["t"] = token
@@ -116,6 +120,19 @@ if ss.user is None:
     token = st.query_params.get("t")
     if token:
         ss.user = _session_store().get(token)
+        if ss.user:
+            api.set_token(ss.user.get("access_token"))
+
+# Token expired mid-session — clear and go back to login
+if api.is_auth_expired():
+    api.set_token(None)
+    api.clear_auth_expired()
+    session_token = st.query_params.get("t")
+    if session_token:
+        _session_store().pop(session_token, None)
+    st.query_params.clear()
+    ss.user = None
+    st.rerun()
 
 if ss.user is None:
     login_screen()
@@ -159,6 +176,7 @@ with st.sidebar:
         token = st.query_params.get("t")
         if token:
             _session_store().pop(token, None)
+        api.set_token(None)
         st.query_params.clear()
         ss.user = None
         st.rerun()
@@ -206,6 +224,41 @@ def tables_board():
         label_visibility="collapsed",
     )
 
+    # Date filter — only shown when Closed is selected
+    closed_date = None
+    if ss.status_filter == "Closed":
+        # Pre-set widget state before it renders (Today button sets this flag on previous rerun)
+        if ss.get("_date_picker_jump"):
+            ss["closed_date_picker"] = ss.closed_date_filter
+            del ss["_date_picker_jump"]
+
+        tog_col, date_col, today_col = st.columns([2, 3, 1])
+        with tog_col:
+            st.write("")
+            ss.date_filter_enabled = st.toggle(
+                "Filter by date",
+                value=ss.date_filter_enabled,
+                key="date_filter_toggle",
+            )
+        if ss.date_filter_enabled:
+            with date_col:
+                date_val = ss.closed_date_filter if ss.closed_date_filter else date.today()
+                picked = st.date_input(
+                    "Closed on",
+                    value=date_val,
+                    max_value=date.today(),
+                    key="closed_date_picker",
+                    label_visibility="collapsed",
+                )
+                ss.closed_date_filter = picked
+                closed_date = picked.isoformat()
+            with today_col:
+                st.write("")
+                if st.button("Today", key="today_date_filter", use_container_width=True):
+                    ss.closed_date_filter = date.today()
+                    ss["_date_picker_jump"] = True
+                    st.rerun()
+
     # Close confirmation (card-level)
     if ss.confirm_close_card_id:
         tables_data, _ = api.get_tables()
@@ -228,7 +281,7 @@ def tables_board():
 
     # Load tables
     status_param = None if ss.status_filter == "All" else ss.status_filter
-    tables, err = api.get_tables(status_param)
+    tables, err = api.get_tables(status_param, date=closed_date)
     if err:
         st.error(err)
         return
@@ -240,16 +293,23 @@ def tables_board():
     cols = st.columns(3)
     for i, t in enumerate(tables):
         with cols[i % 3]:
+            is_closed = t["status"] == "Closed"
             with st.container(border=True):
-                badge = "🟢" if t["status"] == "Active" else "⚫"
-                st.markdown(f"### {t['table_name']}")
-                st.markdown(f"{badge} **{t['status']}**")
+                # Name + status badge (badge hidden when filter already shows only Closed)
+                if is_closed:
+                    st.markdown(f"**{t['table_name']}**")
+                else:
+                    st.markdown(f"### {t['table_name']}")
+                    st.markdown("🟢 **Active**")
 
-                if t["status"] == "Closed":
-                    st.metric("Total", f"${t['total']:.2f}")
+                if is_closed:
+                    total_str = f"${t['total']:.2f}"
+                    st.markdown(f"<span style='font-size:1.8rem;font-weight:700'>{total_str}</span>", unsafe_allow_html=True)
                     if t.get("closed_at"):
                         closed = datetime.fromisoformat(t["closed_at"]).strftime("%b %d, %H:%M")
-                        st.caption(f"Closed {closed}")
+                        st.caption(f"🔒 Closed {closed}")
+                    if st.button("View receipt", key=f"view_{t['id']}", use_container_width=True, type="secondary"):
+                        nav_to("table_detail", t["id"])
                 else:
                     table, err = api.get_table(t['id'])
                     if err:
@@ -259,12 +319,11 @@ def tables_board():
                     running_total = sum(o["price"] * o["quantity"] for o in orders)
                     st.metric("Running Total", f"${running_total:.2f}")
 
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button("View", key=f"view_{t['id']}", use_container_width=True, type="primary"):
-                        nav_to("table_detail", t["id"])
-                with b2:
-                    if t["status"] == "Active":
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("View", key=f"view_{t['id']}", use_container_width=True, type="primary"):
+                            nav_to("table_detail", t["id"])
+                    with b2:
                         if st.button("Close", key=f"close_card_{t['id']}", use_container_width=True):
                             ss.confirm_close_card_id = t["id"]
                             st.rerun()

@@ -1,5 +1,8 @@
 import json
+from datetime import datetime, timedelta, timezone
+
 import bcrypt as _bcrypt
+from jose import JWTError, jwt
 
 # All valid permission identifiers
 ALL_PERMISSIONS = {"tables", "items", "stock", "stats", "users", "roles"}
@@ -46,3 +49,19 @@ def decode_permissions(raw: str) -> list[str]:
         return json.loads(raw)
     except Exception:
         return []
+
+
+_ALGORITHM = "HS256"
+_TOKEN_EXPIRE_HOURS = 12
+
+
+def create_access_token(user_id: int, secret_key: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=_TOKEN_EXPIRE_HOURS)
+    payload = {"sub": str(user_id), "exp": expire}
+    return jwt.encode(payload, secret_key, algorithm=_ALGORITHM)
+
+
+def decode_access_token(token: str, secret_key: str) -> int:
+    """Returns user_id. Raises JWTError on invalid/expired token."""
+    payload = jwt.decode(token, secret_key, algorithms=[_ALGORITHM])
+    return int(payload["sub"])

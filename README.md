@@ -29,10 +29,16 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 1**   | Backend tests                  | ✅ Done         |
 | **Phase 1**   | Streamlit frontend             | ✅ Done (stub)  |
 | **Phase 2**   | Stock Management               | ✅ Done         |
+| **Phase 2**   | Low-stock alerts               | ❌ Planned      |
 | **Phase 2**   | Recipe Components              | ❌ Planned      |
 | **Phase 3**   | User Authentication + RBAC     | ✅ Done         |
+| **Phase 3**   | JWT enforcement on all routes  | ✅ Done         |
+| **Phase 3**   | Token expiry → redirect login  | ✅ Done         |
+| **Phase 3**   | Pagination on list endpoints   | ❌ Planned      |
+| **Phase 3**   | Rate limiting (login)          | ❌ Planned      |
 | **Phase 3**   | Shifts Management              | ❌ Planned      |
 | **Phase 4**   | WebSocket Real-time            | ❌ Planned      |
+| **Phase 4**   | Bill / receipt export          | ❌ Planned      |
 | **Phase 5**   | Audit Logging                  | ❌ Planned      |
 | **Phase 6**   | Payment Processing             | ❌ Planned      |
 
@@ -102,7 +108,7 @@ app/
   main.py                  FastAPI entry point
   api/
     router.py              mounts sub-routers under /api
-    new_routes.py          active v1 endpoints (auth, roles, users, items, tables, orders, stats)
+    routes_v1.py           active v1 endpoints (auth, roles, users, items, tables, orders, stats)
   models/
     models.py              SQLModel table definitions (Role, User, Item, Table, Order)
   schemas/
@@ -112,7 +118,7 @@ app/
     auth_service.py        password hashing (bcrypt), permission encoding, default roles
   core/
     database.py            engine + get_session dependency
-    config.py              reads POSTGRES_URL env var
+    config.py              reads POSTGRES_URL, SECRET_KEY env vars
   migrations/              Alembic migration files
   tests/
     conftest.py            SQLite test fixtures
@@ -141,11 +147,11 @@ pyproject.toml             pytest config
 
 ## API Overview
 
-All endpoints are versioned under `/api/v1/`. Full schema in `docs/architecture.md`.
+All endpoints are versioned under `/api/v1/`. All routes except login require `Authorization: Bearer <token>`. Full schema in `docs/architecture.md`.
 
 | Resource       | Endpoints |
 |----------------|-----------|
-| Auth           | `POST /api/v1/auth/login` → returns user info + permissions |
+| Auth           | `POST /api/v1/auth/login` → JWT token + user info (only public endpoint) |
 | Roles          | CRUD `/api/v1/roles/` |
 | Users          | CRUD `/api/v1/users/` + `?name=` filter |
 | Items (menu)   | CRUD `/api/v1/items/` with `?name=`, `?category=`, `?available_only=` filters; `PATCH /items/{id}/stock` (delta adjustment) |

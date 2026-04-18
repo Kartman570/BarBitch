@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, PostgresDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict # type: ignore
+from pydantic import BaseModel, PostgresDsn
+from pydantic_settings import BaseSettings # type: ignore
 
 
 class DatabaseConfig(BaseModel):
@@ -8,5 +8,6 @@ class DatabaseConfig(BaseModel):
 
 class Settings(BaseSettings):
     database: DatabaseConfig = DatabaseConfig()
+    secret_key: str = "change-me-in-production"
 
 settings = Settings()

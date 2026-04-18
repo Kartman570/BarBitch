@@ -52,6 +52,7 @@ class LoginRequest(BaseModel):
     password: str
 
 class LoginResponse(BaseModel):
+    access_token: str
     id: int
     name: str
     username: str

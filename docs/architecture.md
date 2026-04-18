@@ -21,8 +21,9 @@
 ```
 HTTP → FastAPI (app/main.py)
      → Router (app/api/router.py)
-     → new_routes.py
-     → TableService (app/services/table_service.py)
+     → routes_v1.py
+          → get_current_user (JWT validation, HTTPBearer)
+          → TableService / AuthService (app/services/)
      → SQLModel session
      → PostgreSQL
 ```
@@ -32,61 +33,63 @@ HTTP → FastAPI (app/main.py)
 ## API Schema
 
 All endpoints are versioned under `/api/v1/`.
+Protected routes require `Authorization: Bearer <token>` header (JWT).
 
 ```
 /api/v1/
 
-  users/
+  auth/                         ✅ Implemented
+      POST   /login             Authenticate (username + password) → JWT token + user info
+                                  ⚠ Only unauthenticated endpoint
+
+  roles/                        ✅ Implemented
+      POST   /                  Create role (name, description, permissions[])
+      GET    /                  List roles
+      GET    /{role_id}         Get role
+      PATCH  /{role_id}         Update role
+      DELETE /{role_id}         Delete role (blocked if users assigned or name="admin")
+
+  users/                        ✅ Implemented
       POST   /                  Create user
-      GET    /                  List users
+      GET    /                  List users  (filter: ?name=)
       GET    /{user_id}         Get user
-      PUT    /{user_id}         Update user
+      PUT    /{user_id}         Update user (name, username, password, role_id)
       DELETE /{user_id}         Delete user
 
-  auth/                         ← Phase 3
-      POST   /login             Authenticate → token
-      POST   /logout            Invalidate token
-      GET    /me                Current user info
-
-  items/
+  items/                        ✅ Implemented
       POST   /                  Create menu item
-      GET    /                  List items  (filter: category, available)
+      GET    /                  List items  (filter: ?name=, ?category=, ?available_only=)
       GET    /{item_id}         Get item
-      PUT    /{item_id}         Update item (price, availability)
+      PUT    /{item_id}         Update item
       DELETE /{item_id}         Delete item
+      PATCH  /{item_id}/stock   Adjust stock delta (positive = add, negative = remove)
 
-  tables/                       ← "table" = one customer session / tab
+  tables/                       ✅ Implemented  ("table" = one customer session / tab)
       POST   /                  Open table
-      GET    /                  List tables  (filter: status=active|closed)
-      GET    /{table_id}        Get table + order summary
+      GET    /                  List tables  (filter: ?status=Active|Closed)
+      GET    /{table_id}        Get table + nested orders
       PATCH  /{table_id}        Rename / update table
-      POST   /{table_id}/close  Close table and lock bill
+      POST   /{table_id}/close  Close table and lock bill total
       DELETE /{table_id}        Delete table
 
-  tables/{table_id}/orders/
-      POST   /                  Add item to table
+  tables/{table_id}/orders/     ✅ Implemented
+      POST   /                  Add item to table (deducts stock if tracked)
       GET    /                  List orders for table
       GET    /{order_id}        Get order line
-      PATCH  /{order_id}        Update quantity
+      PATCH  /{order_id}        Update quantity (adjusts stock delta)
       DELETE /{order_id}        Cancel order line
 
-  ingredients/                  ← Phase 2
-      POST   /                  Add ingredient
-      GET    /                  List ingredients with stock levels
-      PUT    /{ingredient_id}   Update ingredient / restock
-      DELETE /{ingredient_id}   Remove ingredient
-
-  items/{item_id}/recipe        ← Phase 2
+  items/{item_id}/recipe        ← Phase 2 (planned)
       GET    /                  Get recipe (ingredient list)
       PUT    /                  Set / update recipe
 
-  stats/
+  stats/                        ✅ Implemented
       GET    /daily             Daily summary  (?date=YYYY-MM-DD, defaults today)
 
-  audit/                        ← Phase 5
+  audit/                        ← Phase 5 (planned)
       GET    /                  Query audit log  (filter: entity, actor, date)
 
-  payments/                     ← Phase 6
+  payments/                     ← Phase 6 (planned)
       POST   /                  Process payment for a table
       GET    /                  List payments  (filter: date, method)
       GET    /{payment_id}      Get payment receipt
@@ -128,15 +131,23 @@ All endpoints are versioned under `/api/v1/`.
 
 ## DB Schema
 
-### Phase 1 — Core (current)
+### Phase 1 + 2 + 3 — Core (current)
 
 ```mermaid
 erDiagram
-    USER {
+    ROLE {
         int     id          PK
+        string  name        "admin | manager | barman | cook"
+        string  description
+        string  permissions "JSON-encoded list: [\"tables\",\"items\",...]"
+    }
+
+    USER {
+        int     id            PK
         string  name
-        string  role        "admin | barman | cook"
-        datetime created_at
+        string  username      "login identifier (unique)"
+        string  password_hash "bcrypt"
+        int     role_id       FK
     }
 
     ITEM {
@@ -145,6 +156,7 @@ erDiagram
         float   price       "current list price"
         string  category    "beer | cocktail | food | ..."
         bool    is_available
+        float   stock_qty   "null = not tracked"
         datetime created_at
         datetime updated_at
     }
@@ -152,7 +164,8 @@ erDiagram
     TABLE {
         int     id          PK
         string  table_name  "human label: Table 3, Bar Tab..."
-        string  status      "active | closed"
+        string  status      "Active | Closed"
+        float   total       "locked bill total (set on close)"
         datetime created_at
         datetime updated_at
         datetime closed_at  "null while active"
@@ -162,17 +175,20 @@ erDiagram
         int     id          PK
         int     table_id    FK
         int     item_id     FK
-        int     quantity
-        float   price_fixed "snapshot of price at order time"
+        float   quantity
+        float   price       "snapshot of price at order time"
         datetime created_at
     }
 
+    ROLE  ||--o{ USER  : "assigned to"
     TABLE ||--o{ ORDER : "contains"
     ITEM  ||--o{ ORDER : "referenced by"
 ```
 
-> `price_fixed` is critical: it locks the price at the moment of ordering so
-> later price changes do not affect open or past bills.
+> `ORDER.price` locks the price at the moment of ordering so later price
+> changes do not affect open or past bills.
+
+**Available permissions:** `tables`, `items`, `stock`, `stats`, `users`, `roles`
 
 ---
 
@@ -204,17 +220,11 @@ When an order is placed, `qty_per_unit × quantity` is deducted from
 
 ### Phase 3 — Auth & Shifts
 
-Additions to `USER`:
-
-| Column        | Type   | Note                      |
-|---------------|--------|---------------------------|
-| password_hash | string | bcrypt                    |
-| is_active     | bool   | soft-disable accounts     |
-
-New table:
+Auth with RBAC is **implemented** (see current schema above).
+`is_active` flag and Shifts table are still planned:
 
 ```
-SHIFT
+SHIFT                             ← planned
   id         PK
   user_id    FK → USER
   opened_at  datetime
@@ -254,3 +264,9 @@ PAYMENT
 
 A table can only be closed after a payment record exists for the full
 bill amount. Partial payments (split bills) will be one payment row each.
+
+---
+
+## Backlog
+
+See implementation status table in `README.md`.

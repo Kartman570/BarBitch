@@ -2,16 +2,38 @@ import os
 import requests
 
 _BASE = os.getenv("API_URL", "http://localhost:8000").rstrip("/") + "/api/v1"
+_token: str | None = None
+_auth_expired: bool = False
+
+
+def set_token(token: str | None) -> None:
+    global _token
+    _token = token
+
+
+def is_auth_expired() -> bool:
+    return _auth_expired
+
+
+def clear_auth_expired() -> None:
+    global _auth_expired
+    _auth_expired = False
 
 
 def _req(method, path, **kwargs):
+    global _auth_expired
+    headers = kwargs.pop("headers", {})
+    if _token:
+        headers["Authorization"] = f"Bearer {_token}"
     try:
-        r = requests.request(method, f"{_BASE}{path}", timeout=5, **kwargs)
+        r = requests.request(method, f"{_BASE}{path}", timeout=5, headers=headers, **kwargs)
         r.raise_for_status()
         return r.json(), None
     except requests.exceptions.ConnectionError:
         return None, "Cannot reach the server. Is the backend running?"
     except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401 and path != "/auth/login":
+            _auth_expired = True
         try:
             detail = e.response.json().get("detail", str(e))
         except Exception:
@@ -46,9 +68,13 @@ def delete_role(rid):
 
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
-def get_tables(status=None):
-    params = {"status": status} if status else None
-    return _req("GET", "/tables/", params=params)
+def get_tables(status=None, date=None):
+    params = {}
+    if status:
+        params["status"] = status
+    if date:
+        params["date"] = date
+    return _req("GET", "/tables/", params=params or None)
 
 def create_table(name):
     return _req("POST", "/tables/", json={"table_name": name})

@@ -116,3 +116,41 @@ class TestAuth:
         })
         assert r.status_code == 400
         assert "already taken" in r.json()["detail"]
+
+    def test_login_returns_access_token(self, client):
+        self._create_role_and_user(client, "alice", "secret")
+        r = client.post(f"{BASE}/auth/login", json={"username": "alice", "password": "secret"})
+        assert r.status_code == 200
+        assert "access_token" in r.json()
+        assert len(r.json()["access_token"]) > 20
+
+
+class TestTokenEnforcement:
+    """Tests that protected routes reject requests with missing or invalid tokens."""
+
+    def test_no_token_returns_401(self, raw_client):
+        r = raw_client.get(f"{BASE}/items/")
+        assert r.status_code == 401
+
+    def test_invalid_token_returns_401(self, raw_client):
+        r = raw_client.get(
+            f"{BASE}/items/",
+            headers={"Authorization": "Bearer this.is.not.a.valid.jwt"},
+        )
+        assert r.status_code == 401
+
+    def test_expired_token_returns_401(self, raw_client):
+        from datetime import datetime, timedelta, timezone
+        from jose import jwt
+
+        expired_token = jwt.encode(
+            {"sub": "1", "exp": datetime.now(timezone.utc) - timedelta(hours=1)},
+            "change-me-in-production",
+            algorithm="HS256",
+        )
+        r = raw_client.get(
+            f"{BASE}/items/",
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+        assert r.status_code == 401
+
