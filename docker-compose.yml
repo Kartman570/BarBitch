@@ -11,6 +11,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY env var is required. See .env.example}
+      RECEIPT_QR: ${RECEIPT_QR:-}
+      RECEIPT_QR_TITLE: ${RECEIPT_QR_TITLE:-}
     ports:
       - "8000:8000"
     # --reload is intentional for development (hot-reload on file save).

@@ -41,6 +41,8 @@ docker compose down        # stop
 | `SECRET_KEY` | ✅ | — | JWT signing key. Generate: `openssl rand -hex 32` |
 | `POSTGRES_PASSWORD` | ✅ | `postgres` | PostgreSQL password |
 | `DEBUG` | — | `true` | Set `false` in production to hide `/docs` and `/openapi.json` |
+| `RECEIPT_QR` | — | `""` | Message encoded as QR code on receipts (omit to skip QR) |
+| `RECEIPT_QR_TITLE` | — | `""` | Additional text message below QR code on receipts (omit to skip) |
 
 ### Database migrations
 ```bash

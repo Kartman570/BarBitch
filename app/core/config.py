@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     database: DatabaseConfig = DatabaseConfig()
     secret_key: str  # MUST be set via SECRET_KEY env var — no default
     debug: bool = True  # set DEBUG=false in production to hide /docs and /openapi.json
+    receipt_qr: str = ""  # set RECEIPT_QR env var; shown as QR code on receipts
+    receipt_qr_title: str = ""
 
     def __init__(self, **data):
         super().__init__(**data)
