@@ -1,33 +1,49 @@
-from datetime import datetime, date as date_type
+from datetime import datetime, date as date_type, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
+from jwt.exceptions import PyJWTError as JWTError
 from sqlmodel import select
 
-from models.models import User, Item, Order, Table, Role
+from models.models import User, Item, Order, Table, Role, RefreshToken, AuditEvent
 from schemas.schemas_order import (
     RoleCreate, RoleRead, RoleUpdate,
     UserCreate, UserRead, UserUpdate,
-    LoginRequest, LoginResponse,
+    LoginRequest, LoginResponse, RefreshRequest, RefreshResponse,
     ItemCreate, ItemRead, ItemUpdate, StockAdjust,
     OrderCreate, OrderRead, OrderUpdate,
     TableCreate, TableRead, TableUpdate, TableReadDetailed,
-    DailyStats,
+    DailyStats, AuditEventRead,
 )
 from core.database import SessionDep
 from core.config import settings
+from core.limiter import limiter
 from services.table_service import TableService
 from services.auth_service import (
     hash_password, verify_password,
     encode_permissions, decode_permissions,
     create_access_token, decode_access_token,
+    create_refresh_token_string, REFRESH_TOKEN_EXPIRE_DAYS,
     ALL_PERMISSIONS,
 )
 
 router = APIRouter()
 _bearer = HTTPBearer()
+
+
+def _get_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
+def _audit(session, action: str, user: User | None = None, resource_id: int | None = None, ip: str | None = None):
+    session.add(AuditEvent(
+        user_id=user.id if user else None,
+        username=user.username if user else None,
+        action=action,
+        resource_id=resource_id,
+        ip=ip,
+    ))
 
 
 def get_current_user(
@@ -47,25 +63,71 @@ def get_current_user(
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
+def _perm(perm: str):
+    """Returns a Depends that enforces a named permission from the user's role."""
+    def checker(user: CurrentUserDep, session: SessionDep) -> User:
+        role = session.get(Role, user.role_id) if user.role_id else None
+        if role is None:
+            raise HTTPException(status_code=403, detail="No role assigned to this account")
+        if perm not in decode_permissions(role.permissions):
+            raise HTTPException(status_code=403, detail=f"Permission '{perm}' required")
+        return user
+    return Depends(checker)
+
+
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
 @router.post("/auth/login", response_model=LoginResponse, tags=["auth"])
-def login(data: LoginRequest, session: SessionDep):
+@limiter.limit("10/minute")
+def login(request: Request, data: LoginRequest, session: SessionDep):
+    ip = _get_ip(request)
     user = session.exec(select(User).where(User.username == data.username)).first()
-    if user is None or user.password_hash is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(data.password, user.password_hash):
+    if user is None or user.password_hash is None or not verify_password(data.password, user.password_hash):
+        _audit(session, "login_failure", ip=ip)
+        session.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
     role = session.get(Role, user.role_id) if user.role_id else None
     permissions = decode_permissions(role.permissions) if role else []
+    token_str = create_refresh_token_string()
+    session.add(RefreshToken(
+        token=token_str,
+        user_id=user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+    ))
+    _audit(session, "login_success", user=user, ip=ip)
+    session.commit()
     return LoginResponse(
         access_token=create_access_token(user.id, settings.secret_key),
+        refresh_token=token_str,
         id=user.id,
         name=user.name,
         username=user.username,
         role_name=role.name if role else "",
         permissions=permissions,
     )
+
+
+@router.post("/auth/refresh", response_model=RefreshResponse, tags=["auth"])
+def refresh_token(data: RefreshRequest, session: SessionDep):
+    rt = session.exec(select(RefreshToken).where(RefreshToken.token == data.refresh_token)).first()
+    if rt is None or rt.revoked_at is not None:
+        raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
+    if rt.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    user = session.get(User, rt.user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return RefreshResponse(access_token=create_access_token(user.id, settings.secret_key))
+
+
+@router.post("/auth/logout", tags=["auth"])
+def logout(data: RefreshRequest, session: SessionDep):
+    rt = session.exec(select(RefreshToken).where(RefreshToken.token == data.refresh_token)).first()
+    if rt and rt.revoked_at is None:
+        rt.revoked_at = datetime.now(timezone.utc)
+        session.add(rt)
+        session.commit()
+    return {"message": "Logged out"}
 
 
 # ── Roles ──────────────────────────────────────────────────────────────────────
@@ -80,7 +142,7 @@ def _role_to_read(role: Role) -> RoleRead:
 
 
 @router.post("/roles/", response_model=RoleRead, tags=["roles"])
-def create_role(data: RoleCreate, session: SessionDep, _: CurrentUserDep):
+def create_role(data: RoleCreate, session: SessionDep, actor: Annotated[User, _perm("roles")]):
     invalid = set(data.permissions) - ALL_PERMISSIONS
     if invalid:
         raise HTTPException(status_code=400, detail=f"Unknown permissions: {sorted(invalid)}")
@@ -93,19 +155,21 @@ def create_role(data: RoleCreate, session: SessionDep, _: CurrentUserDep):
         permissions=encode_permissions(data.permissions),
     )
     session.add(role)
+    session.flush()
+    _audit(session, "role_created", user=actor, resource_id=role.id)
     session.commit()
     session.refresh(role)
     return _role_to_read(role)
 
 
 @router.get("/roles/", response_model=list[RoleRead], tags=["roles"])
-def list_roles(session: SessionDep, _: CurrentUserDep):
+def list_roles(session: SessionDep, _: Annotated[User, _perm("roles")]):
     roles = session.exec(select(Role)).all()
     return [_role_to_read(r) for r in roles]
 
 
 @router.get("/roles/{role_id}", response_model=RoleRead, tags=["roles"])
-def get_role(role_id: int, session: SessionDep, _: CurrentUserDep):
+def get_role(role_id: int, session: SessionDep, _: Annotated[User, _perm("roles")]):
     role = session.get(Role, role_id)
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
@@ -113,7 +177,7 @@ def get_role(role_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.patch("/roles/{role_id}", response_model=RoleRead, tags=["roles"])
-def update_role(role_id: int, data: RoleUpdate, session: SessionDep, _: CurrentUserDep):
+def update_role(role_id: int, data: RoleUpdate, session: SessionDep, _: Annotated[User, _perm("roles")]):
     role = session.get(Role, role_id)
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
@@ -133,7 +197,7 @@ def update_role(role_id: int, data: RoleUpdate, session: SessionDep, _: CurrentU
 
 
 @router.delete("/roles/{role_id}", tags=["roles"])
-def delete_role(role_id: int, session: SessionDep, _: CurrentUserDep):
+def delete_role(role_id: int, session: SessionDep, actor: Annotated[User, _perm("roles")]):
     role = session.get(Role, role_id)
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
@@ -142,6 +206,7 @@ def delete_role(role_id: int, session: SessionDep, _: CurrentUserDep):
     assigned = session.exec(select(User).where(User.role_id == role_id)).first()
     if assigned:
         raise HTTPException(status_code=400, detail="Cannot delete role with assigned users")
+    _audit(session, "role_deleted", user=actor, resource_id=role_id)
     session.delete(role)
     session.commit()
     return {"message": "Role deleted"}
@@ -162,7 +227,7 @@ def _user_to_read(user: User, session) -> UserRead:
 
 
 @router.post("/users/", response_model=UserRead, tags=["users"])
-def create_user(data: UserCreate, session: SessionDep, _: CurrentUserDep):
+def create_user(data: UserCreate, session: SessionDep, actor: Annotated[User, _perm("users")]):
     if session.exec(select(User).where(User.username == data.username)).first():
         raise HTTPException(status_code=400, detail=f"Username '{data.username}' already taken")
     if session.get(Role, data.role_id) is None:
@@ -174,6 +239,8 @@ def create_user(data: UserCreate, session: SessionDep, _: CurrentUserDep):
         role_id=data.role_id,
     )
     session.add(user)
+    session.flush()
+    _audit(session, "user_created", user=actor, resource_id=user.id)
     session.commit()
     session.refresh(user)
     return _user_to_read(user, session)
@@ -182,7 +249,7 @@ def create_user(data: UserCreate, session: SessionDep, _: CurrentUserDep):
 @router.get("/users/", response_model=list[UserRead], tags=["users"])
 def list_users(
     session: SessionDep,
-    _: CurrentUserDep,
+    _: Annotated[User, _perm("users")],
     name: Optional[str] = Query(None, description="Filter by name"),
 ):
     q = select(User)
@@ -193,7 +260,7 @@ def list_users(
 
 
 @router.get("/users/{user_id}", response_model=UserRead, tags=["users"])
-def get_user(user_id: int, session: SessionDep, _: CurrentUserDep):
+def get_user(user_id: int, session: SessionDep, _: Annotated[User, _perm("users")]):
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -201,7 +268,7 @@ def get_user(user_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.put("/users/{user_id}", response_model=UserRead, tags=["users"])
-def update_user(user_id: int, data: UserUpdate, session: SessionDep, _: CurrentUserDep):
+def update_user(user_id: int, data: UserUpdate, session: SessionDep, _: Annotated[User, _perm("users")]):
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -225,10 +292,13 @@ def update_user(user_id: int, data: UserUpdate, session: SessionDep, _: CurrentU
 
 
 @router.delete("/users/{user_id}", tags=["users"])
-def delete_user(user_id: int, session: SessionDep, _: CurrentUserDep):
+def delete_user(user_id: int, session: SessionDep, actor: Annotated[User, _perm("users")]):
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    if user_id == actor.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    _audit(session, "user_deleted", user=actor, resource_id=user_id)
     session.delete(user)
     session.commit()
     return {"message": "User deleted"}
@@ -237,7 +307,7 @@ def delete_user(user_id: int, session: SessionDep, _: CurrentUserDep):
 # ── Items ──────────────────────────────────────────────────────────────────────
 
 @router.post("/items/", response_model=ItemRead, tags=["items"])
-def create_item(data: ItemCreate, session: SessionDep, _: CurrentUserDep):
+def create_item(data: ItemCreate, session: SessionDep, _: Annotated[User, _perm("items")]):
     item = Item(**data.model_dump())
     session.add(item)
     session.commit()
@@ -248,7 +318,7 @@ def create_item(data: ItemCreate, session: SessionDep, _: CurrentUserDep):
 @router.get("/items/", response_model=list[ItemRead], tags=["items"])
 def list_items(
     session: SessionDep,
-    _: CurrentUserDep,
+    _: Annotated[User, _perm("items")],
     name: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     available_only: bool = Query(False),
@@ -264,7 +334,7 @@ def list_items(
 
 
 @router.get("/items/{item_id}", response_model=ItemRead, tags=["items"])
-def get_item(item_id: int, session: SessionDep, _: CurrentUserDep):
+def get_item(item_id: int, session: SessionDep, _: Annotated[User, _perm("items")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -272,7 +342,7 @@ def get_item(item_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.put("/items/{item_id}", response_model=ItemRead, tags=["items"])
-def update_item(item_id: int, data: ItemUpdate, session: SessionDep, _: CurrentUserDep):
+def update_item(item_id: int, data: ItemUpdate, session: SessionDep, _: Annotated[User, _perm("items")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -286,7 +356,7 @@ def update_item(item_id: int, data: ItemUpdate, session: SessionDep, _: CurrentU
 
 
 @router.delete("/items/{item_id}", tags=["items"])
-def delete_item(item_id: int, session: SessionDep, _: CurrentUserDep):
+def delete_item(item_id: int, session: SessionDep, _: Annotated[User, _perm("items")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -296,7 +366,7 @@ def delete_item(item_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.patch("/items/{item_id}/stock", response_model=ItemRead, tags=["items"])
-def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: CurrentUserDep):
+def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: Annotated[User, _perm("stock")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -316,7 +386,7 @@ def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: Curren
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
 @router.post("/tables/", response_model=TableRead, tags=["tables"])
-def create_table(data: TableCreate, session: SessionDep, _: CurrentUserDep):
+def create_table(data: TableCreate, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = TableService(session).create_table(data)
     return table
 
@@ -324,7 +394,7 @@ def create_table(data: TableCreate, session: SessionDep, _: CurrentUserDep):
 @router.get("/tables/", response_model=list[TableRead], tags=["tables"])
 def list_tables(
     session: SessionDep,
-    _: CurrentUserDep,
+    _: Annotated[User, _perm("tables")],
     status: Optional[str] = Query(None, description="Filter by status: Active | Closed"),
     date: Optional[str] = Query(None, description="Filter closed tables by date YYYY-MM-DD"),
 ):
@@ -345,7 +415,7 @@ def list_tables(
 
 
 @router.get("/tables/{table_id}", response_model=TableReadDetailed, tags=["tables"])
-def get_table(table_id: int, session: SessionDep, _: CurrentUserDep):
+def get_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -353,7 +423,7 @@ def get_table(table_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.patch("/tables/{table_id}", response_model=TableRead, tags=["tables"])
-def update_table(table_id: int, data: TableUpdate, session: SessionDep, _: CurrentUserDep):
+def update_table(table_id: int, data: TableUpdate, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -367,7 +437,7 @@ def update_table(table_id: int, data: TableUpdate, session: SessionDep, _: Curre
 
 
 @router.post("/tables/{table_id}/close", response_model=TableRead, tags=["tables"])
-def close_table(table_id: int, session: SessionDep, _: CurrentUserDep):
+def close_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -379,7 +449,7 @@ def close_table(table_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.delete("/tables/{table_id}", tags=["tables"])
-def delete_table(table_id: int, session: SessionDep, _: CurrentUserDep):
+def delete_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -391,7 +461,7 @@ def delete_table(table_id: int, session: SessionDep, _: CurrentUserDep):
 # ── Orders (nested under tables) ───────────────────────────────────────────────
 
 @router.post("/tables/{table_id}/orders/", response_model=OrderRead, tags=["orders"])
-def add_order(table_id: int, data: OrderCreate, session: SessionDep, _: CurrentUserDep):
+def add_order(table_id: int, data: OrderCreate, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -405,7 +475,7 @@ def add_order(table_id: int, data: OrderCreate, session: SessionDep, _: CurrentU
 
 
 @router.get("/tables/{table_id}/orders/", response_model=list[OrderRead], tags=["orders"])
-def list_orders(table_id: int, session: SessionDep, _: CurrentUserDep):
+def list_orders(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -414,7 +484,7 @@ def list_orders(table_id: int, session: SessionDep, _: CurrentUserDep):
 
 
 @router.get("/tables/{table_id}/orders/{order_id}", response_model=OrderRead, tags=["orders"])
-def get_order(table_id: int, order_id: int, session: SessionDep, _: CurrentUserDep):
+def get_order(table_id: int, order_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -422,7 +492,7 @@ def get_order(table_id: int, order_id: int, session: SessionDep, _: CurrentUserD
 
 
 @router.patch("/tables/{table_id}/orders/{order_id}", response_model=OrderRead, tags=["orders"])
-def update_order(table_id: int, order_id: int, data: OrderUpdate, session: SessionDep, _: CurrentUserDep):
+def update_order(table_id: int, order_id: int, data: OrderUpdate, session: SessionDep, _: Annotated[User, _perm("tables")]):
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -453,7 +523,7 @@ def update_order(table_id: int, order_id: int, data: OrderUpdate, session: Sessi
 
 
 @router.delete("/tables/{table_id}/orders/{order_id}", tags=["orders"])
-def delete_order(table_id: int, order_id: int, session: SessionDep, _: CurrentUserDep):
+def delete_order(table_id: int, order_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -467,7 +537,7 @@ def delete_order(table_id: int, order_id: int, session: SessionDep, _: CurrentUs
 @router.get("/stats/daily", response_model=DailyStats, tags=["stats"])
 def daily_stats(
     session: SessionDep,
-    _: CurrentUserDep,
+    _: Annotated[User, _perm("stats")],
     date: Optional[str] = Query(None, description="Date YYYY-MM-DD, defaults to today"),
 ):
     if date:
@@ -478,3 +548,18 @@ def daily_stats(
     else:
         target = date_type.today()
     return TableService(session).daily_stats(target)
+
+
+# ── Audit log ──────────────────────────────────────────────────────────────────
+
+@router.get("/audit/events", response_model=list[AuditEventRead], tags=["audit"])
+def list_audit_events(
+    session: SessionDep,
+    _: Annotated[User, _perm("roles")],
+    action: Optional[str] = Query(None, description="Filter by action"),
+    limit: int = Query(100, le=500),
+):
+    q = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    if action:
+        q = q.where(AuditEvent.action == action)
+    return session.exec(q).all()

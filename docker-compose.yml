@@ -9,9 +9,12 @@ services:
       - ./app:/app
     working_dir: /app
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres@db:5432/postgres
+      DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY env var is required. See .env.example}
     ports:
       - "8000:8000"
+    # --reload is intentional for development (hot-reload on file save).
+    # Remove it for production deployment.
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   db:
@@ -19,7 +22,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:

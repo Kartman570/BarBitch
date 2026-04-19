@@ -69,7 +69,7 @@ class TestUsers:
     def test_create_and_read(self, client):
         role_id = self._make_role(client)
         r = client.post(f"{BASE}/users/", json={
-            "name": "Alice", "username": "alice", "password": "pass", "role_id": role_id
+            "name": "Alice", "username": "alice", "password": "pass123!", "role_id": role_id
         })
         assert r.status_code == 200
         data = r.json()
@@ -84,7 +84,7 @@ class TestUsers:
     def test_update_user(self, client):
         role_id = self._make_role(client, "barman")
         r = client.post(f"{BASE}/users/", json={
-            "name": "Bob", "username": "bob", "password": "pass", "role_id": role_id
+            "name": "Bob", "username": "bob", "password": "pass123!", "role_id": role_id
         })
         user_id = r.json()["id"]
 
@@ -96,7 +96,7 @@ class TestUsers:
     def test_delete_user(self, client):
         role_id = self._make_role(client, "cook")
         r = client.post(f"{BASE}/users/", json={
-            "name": "Carol", "username": "carol", "password": "pass", "role_id": role_id
+            "name": "Carol", "username": "carol", "password": "pass123!", "role_id": role_id
         })
         user_id = r.json()["id"]
         assert client.delete(f"{BASE}/users/{user_id}").status_code == 200

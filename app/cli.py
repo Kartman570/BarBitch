@@ -38,7 +38,8 @@ def seed_roles() -> None:
 def create_user(
     name: str = typer.Option("Admin", "--name"),
     username: str = typer.Option("admin", "--username"),
-    password: str = typer.Option("admin", "--password"),
+    password: str = typer.Option(..., "--password", prompt=True, hide_input=True,
+                                 help="Account password (prompted if not provided)"),
     role: str = typer.Option("admin", "--role"),
     update: bool = typer.Option(False, "--update"),
 ) -> None:
@@ -112,11 +113,13 @@ def seed_items(
 @cli.command("seed-all")
 def seed_all(
     user_name: str = typer.Option("Admin", "--user-name"),
+    admin_password: str = typer.Option(..., "--admin-password", prompt=True, hide_input=True,
+                                       help="Password for the admin account"),
     items_if_empty: bool = typer.Option(True, "--items-if-empty/--items-force"),
 ) -> None:
     init_db()
     seed_roles()
-    create_user(name=user_name, username="admin", password="admin", role="admin", update=False)
+    create_user(name=user_name, username="admin", password=admin_password, role="admin", update=False)
     seed_items(if_empty=items_if_empty)
     typer.echo("All done.")
 

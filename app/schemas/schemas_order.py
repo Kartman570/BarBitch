@@ -1,6 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from services.auth_service import validate_password_complexity
 
 
 # ==== ROLE SCHEMAS ====
@@ -30,6 +31,11 @@ class UserCreate(BaseModel):
     password: str
     role_id: int
 
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
+
 class UserRead(BaseModel):
     id: int
     name: str
@@ -44,6 +50,13 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None  # plain text, will be hashed
     role_id: Optional[int] = None
 
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return validate_password_complexity(v)
+
 
 # ==== AUTH SCHEMAS ====
 
@@ -53,6 +66,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     id: int
     name: str
     username: str
@@ -60,14 +74,33 @@ class LoginResponse(BaseModel):
     permissions: List[str]
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+
+
+class AuditEventRead(BaseModel):
+    id: int
+    user_id: Optional[int]
+    username: Optional[str]
+    action: str
+    resource_id: Optional[int]
+    ip: Optional[str]
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ==== ITEM SCHEMAS ====
 
 class ItemCreate(BaseModel):
     name: str
-    price: float
+    price: float = Field(gt=0)
     category: Optional[str] = None
     is_available: bool = True
-    stock_qty: Optional[float] = None
+    stock_qty: Optional[float] = Field(default=None, ge=0)
 
 class ItemRead(BaseModel):
     id: int
@@ -79,10 +112,9 @@ class ItemRead(BaseModel):
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
-    price: Optional[float] = None
+    price: Optional[float] = Field(default=None, gt=0)
     category: Optional[str] = None
     is_available: Optional[bool] = None
-    stock_qty: Optional[float] = None
 
 class StockAdjust(BaseModel):
     delta: float  # positive = add stock, negative = remove stock
@@ -121,7 +153,7 @@ class TableReadDetailed(BaseModel):
 
 class OrderCreate(BaseModel):
     item_id: int
-    quantity: float = 1.0
+    quantity: float = Field(default=1.0, gt=0)
 
 class OrderRead(BaseModel):
     id: int
@@ -133,7 +165,7 @@ class OrderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class OrderUpdate(BaseModel):
-    quantity: float
+    quantity: float = Field(gt=0)
 
 
 TableReadDetailed.model_rebuild()

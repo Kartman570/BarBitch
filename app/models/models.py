@@ -4,6 +4,27 @@ from datetime import datetime
 from sqlmodel import Field, SQLModel, Relationship
 
 
+class RefreshToken(SQLModel, table=True):
+    __tablename__ = "refresh_tokens"
+    id: int | None = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    expires_at: datetime = Field()
+    revoked_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class AuditEvent(SQLModel, table=True):
+    __tablename__ = "audit_events"
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None)
+    username: str | None = Field(default=None, max_length=50)
+    action: str = Field(max_length=50)
+    resource_id: int | None = Field(default=None)
+    ip: str | None = Field(default=None, max_length=45)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 class Role(SQLModel, table=True):
     __tablename__ = "roles"
     id: int | None = Field(default=None, primary_key=True)
