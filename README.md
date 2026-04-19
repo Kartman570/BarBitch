@@ -38,7 +38,7 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 3**   | Password complexity policy     | ✅ Done         |
 | **Phase 3**   | Rate limiting (login)          | ✅ Done         |
 | **Phase 3**   | Security headers + CORS        | ✅ Done         |
-| **Phase 3**   | Multilanguage support          | ❌ Planned      |
+| **Phase 3**   | Multilanguage support (EN/RU/KA) | ✅ Done       |
 | **Phase 3**   | Pagination on list endpoints   | ❌ Planned      |
 | **Phase 3**   | Shifts Management              | ❌ Planned      |
 | **Phase 4**   | Bill / receipt export (PDF)    | ✅ Done         |
@@ -73,6 +73,25 @@ docker compose exec app python -m cli seed-all
 
 This creates the DB schema, an Admin user, and a sample menu.
 
+
+## Configuration
+
+All settings live in `.env` (copy from `.env.example`).
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SECRET_KEY` | ✅ | — | JWT signing key. Generate: `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | ✅ | `postgres` | PostgreSQL password |
+| `DEBUG` | — | `true` | Set `false` in production to hide `/docs` |
+| `RECEIPT_QR` | — | `""` | URL encoded as QR code on printed receipts |
+| `RECEIPT_QR_TITLE` | — | `""` | Caption text below the QR code |
+| `VITE_CURRENCY` | — | `RUB` | Currency symbol in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾) |
+
+> **Changing currency:** set `VITE_CURRENCY=GEL` (or `USD`/`EUR`) in `.env`, then restart the client container:
+> ```bash
+> docker compose restart client
+> ```
+> No rebuild needed. The backend is not affected — it stores only numeric values.
 
 ## Development Setup
 

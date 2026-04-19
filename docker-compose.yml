@@ -1,4 +1,20 @@
 
+# ── Variable groups ────────────────────────────────────────────────────────────
+x-env-db: &env-db
+  POSTGRES_USER: postgres
+  POSTGRES_DB: postgres
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+x-env-app: &env-app
+  DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY env var is required. See .env.example}
+  RECEIPT_QR: ${RECEIPT_QR:-}
+  RECEIPT_QR_TITLE: ${RECEIPT_QR_TITLE:-}
+
+x-env-client: &env-client
+  VITE_CURRENCY: ${VITE_CURRENCY:-RUB}
+
+# ── Services ───────────────────────────────────────────────────────────────────
 services:
   app:
 #    platform: linux/arm64
@@ -9,10 +25,7 @@ services:
       - ./app:/app
     working_dir: /app
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY env var is required. See .env.example}
-      RECEIPT_QR: ${RECEIPT_QR:-}
-      RECEIPT_QR_TITLE: ${RECEIPT_QR_TITLE:-}
+      <<: *env-app
     ports:
       - "8000:8000"
     # --reload is intentional for development (hot-reload on file save).
@@ -22,9 +35,7 @@ services:
   db:
     image: postgres:15.5-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_DB: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      <<: *env-db
     ports:
       - "5432:5432"
     volumes:
@@ -37,11 +48,14 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./client:/app
+      - /app/node_modules
     working_dir: /app
-    ports:
-      - "8501:8501"
     environment:
-      - API_URL=http://app:8000
+      <<: *env-client
+    ports:
+      - "8501:5173"
+    depends_on:
+      - app
 
 volumes:
   db_data:

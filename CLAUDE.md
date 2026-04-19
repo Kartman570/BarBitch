@@ -6,7 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **BarPOS** (codename: BarBitch) is an open-source bar management system — a web-native POS/stock system meant to replace proprietary solutions. MVP targets single-bar deployment on a local server.
 
-Stack: FastAPI + SQLModel (SQLAlchemy + Pydantic) + PostgreSQL + Alembic migrations. JWT via PyJWT. Frontend is a temporary Streamlit stub (`client/`).
+Stack: FastAPI + SQLModel (SQLAlchemy + Pydantic) + PostgreSQL + Alembic migrations. JWT via PyJWT. Frontend is React + Vite + Tailwind CSS (`client/`). The old Streamlit stub is preserved in `client_legacy/`.
+
+### Frontend i18n
+
+The frontend supports EN / RU / KA via a lightweight custom i18n layer — no external library.
+
+- `client/src/i18n/index.js` — `useLangStore` (Zustand + localStorage), `useT()` hook, `useDateLocale()`, `pluralItems()`
+- `client/src/i18n/locales/{en,ru,ka}.js` — flat key→string maps; add a new locale by creating a new file and registering it in `index.js`
+- Default language: English. Selection is persisted under the `bar-pos-lang` localStorage key.
+- `useT()` returns a memoized `t(key, vars?)` function; vars use `{{name}}` syntax.
+- `useDateLocale()` returns the BCP-47 tag (`en-US` / `ru-RU` / `ka-GE`) for use with `toLocaleString()`.
 
 ## Development Commands
 
@@ -43,6 +53,7 @@ docker compose down        # stop
 | `DEBUG` | — | `true` | Set `false` in production to hide `/docs` and `/openapi.json` |
 | `RECEIPT_QR` | — | `""` | Message encoded as QR code on receipts (omit to skip QR) |
 | `RECEIPT_QR_TITLE` | — | `""` | Additional text message below QR code on receipts (omit to skip) |
+| `VITE_CURRENCY` | — | `RUB` | Currency symbol shown in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾). Frontend-only. |
 
 ### Database migrations
 ```bash
