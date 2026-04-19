@@ -30,6 +30,8 @@ jobs:
         pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test with pytest
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY || 'ci-test-secret-key-not-used-in-production' }}
       run: |
         cd app
         pytest
