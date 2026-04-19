@@ -137,6 +137,20 @@ def update_stock(iid, delta):
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
+def get_receipt(tid) -> tuple[bytes | None, str | None]:
+    headers = {}
+    if _token:
+        headers["Authorization"] = f"Bearer {_token}"
+    try:
+        r = requests.get(f"{_BASE}/tables/{tid}/receipt", timeout=10, headers=headers)
+        r.raise_for_status()
+        return r.content, None
+    except requests.HTTPError as e:
+        return None, str(e)
+    except Exception as e:
+        return None, str(e)
+
+
 def get_daily_stats(date_str=None):
     params = {"date": date_str} if date_str else None
     return _req("GET", "/stats/daily", params=params)

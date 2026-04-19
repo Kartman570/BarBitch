@@ -1,7 +1,7 @@
 from datetime import datetime, date as date_type, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError as JWTError
 from sqlmodel import select
@@ -446,6 +446,23 @@ def close_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("ta
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return table
+
+
+@router.get("/tables/{table_id}/receipt", tags=["tables"])
+def get_receipt(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
+    table = session.get(Table, table_id)
+    if table is None:
+        raise HTTPException(status_code=404, detail="Table not found")
+    orders = session.exec(select(Order).where(Order.table_id == table_id)).all()
+    item_ids = {o.item_id for o in orders}
+    items = {i.id: i for i in session.exec(select(Item).where(Item.id.in_(item_ids))).all()} if item_ids else {}
+    from services.receipt_service import build_receipt
+    pdf = build_receipt(table, list(orders), items)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=receipt_{table_id}.pdf"},
+    )
 
 
 @router.delete("/tables/{table_id}", tags=["tables"])

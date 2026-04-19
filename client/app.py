@@ -502,6 +502,18 @@ def table_detail():
             if st.button("🔒 Close Table", type="primary", use_container_width=True):
                 ss.confirm_close_table = True
                 st.rerun()
+        else:
+            pdf_bytes, err = api.get_receipt(table["id"])
+            if err:
+                st.error(f"Receipt unavailable: {err}")
+            else:
+                st.download_button(
+                    "📄 Download Receipt",
+                    data=pdf_bytes,
+                    file_name=f"receipt_{table['id']}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
     # ── Add order panel ────────────────────────────────────────────────────────
     if is_active:

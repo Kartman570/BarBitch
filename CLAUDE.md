@@ -117,6 +117,7 @@ All routes require JWT except login.
 | CRUD | `/users/` | User management (password: ≥8 chars + digit/special) |
 | CRUD | `/items/` | Menu items; `PATCH /items/{id}/stock` for stock delta |
 | CRUD | `/tables/` | Tables; `POST /tables/{id}/close` to lock bill |
+| GET | `/tables/{id}/receipt` | Download PDF receipt (A6, Cyrillic-ready) |
 | CRUD | `/tables/{id}/orders/` | Orders (deducts stock on create) |
 | GET | `/stats/daily` | Daily revenue/orders summary |
 | GET | `/audit/events` | Audit log (requires `roles` permission) |

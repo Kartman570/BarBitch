@@ -39,8 +39,10 @@ Protected routes require `Authorization: Bearer <token>` header (JWT).
 /api/v1/
 
   auth/                         ✅ Implemented
-      POST   /login             Authenticate (username + password) → JWT token + user info
-                                  ⚠ Only unauthenticated endpoint
+      POST   /login             Authenticate → access_token (12h) + refresh_token (30d)
+                                  ⚠ Only unauthenticated endpoint; rate-limited 10/minute
+      POST   /refresh           Exchange refresh_token → new access_token
+      POST   /logout            Revoke refresh_token
 
   roles/                        ✅ Implemented
       POST   /                  Create role (name, description, permissions[])
@@ -70,6 +72,7 @@ Protected routes require `Authorization: Bearer <token>` header (JWT).
       GET    /{table_id}        Get table + nested orders
       PATCH  /{table_id}        Rename / update table
       POST   /{table_id}/close  Close table and lock bill total
+      GET    /{table_id}/receipt Download PDF receipt (A6, Unicode, Cyrillic-ready)
       DELETE /{table_id}        Delete table
 
   tables/{table_id}/orders/     ✅ Implemented
@@ -86,8 +89,8 @@ Protected routes require `Authorization: Bearer <token>` header (JWT).
   stats/                        ✅ Implemented
       GET    /daily             Daily summary  (?date=YYYY-MM-DD, defaults today)
 
-  audit/                        ← Phase 5 (planned)
-      GET    /                  Query audit log  (filter: entity, actor, date)
+  audit/                        ✅ Implemented
+      GET    /events            Query audit log  (?action=, ?limit=, requires roles perm)
 
   payments/                     ← Phase 6 (planned)
       POST   /                  Process payment for a table
@@ -180,9 +183,29 @@ erDiagram
         datetime created_at
     }
 
-    ROLE  ||--o{ USER  : "assigned to"
-    TABLE ||--o{ ORDER : "contains"
-    ITEM  ||--o{ ORDER : "referenced by"
+    REFRESH_TOKEN {
+        int      id           PK
+        string   token        "urlsafe random 32-byte string (unique)"
+        int      user_id      FK
+        datetime expires_at   "now + 30 days"
+        datetime revoked_at   "null until logout"
+        datetime created_at
+    }
+
+    AUDIT_EVENT {
+        int      id           PK
+        int      user_id      "null for unauthenticated actions"
+        string   username
+        string   action       "login_success | login_failure | ..."
+        int      resource_id  "null for non-resource actions"
+        string   ip           "client IP (max 45 chars for IPv6)"
+        datetime created_at
+    }
+
+    ROLE  ||--o{ USER          : "assigned to"
+    TABLE ||--o{ ORDER         : "contains"
+    ITEM  ||--o{ ORDER         : "referenced by"
+    USER  ||--o{ REFRESH_TOKEN : "owns"
 ```
 
 > `ORDER.price` locks the price at the moment of ordering so later price
@@ -230,23 +253,6 @@ SHIFT                             ← planned
   opened_at  datetime
   closed_at  datetime   (null while shift is open)
 ```
-
----
-
-### Phase 5 — Audit Log
-
-```
-AUDIT_LOG
-  id           PK
-  timestamp    datetime
-  actor_id     FK → USER   (null for system actions)
-  action       enum: CREATE | UPDATE | DELETE
-  entity_type  string      (table, order, item, payment, ...)
-  entity_id    int
-  payload      json        (before/after diff or full snapshot)
-```
-
-All money- and stock-affecting writes go through the audit log.
 
 ---
 
