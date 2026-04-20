@@ -185,7 +185,7 @@ erDiagram
         float   price       "current list price"
         string  category    "beer | cocktail | food | ..."
         bool    is_available
-        float   stock_qty   "null = not tracked"
+        int     stock_qty   "null = not tracked"
         datetime created_at
         datetime updated_at
     }
@@ -204,7 +204,7 @@ erDiagram
         int     id          PK
         int     table_id    FK
         int     item_id     FK
-        float   quantity
+        int     quantity
         float   price       "snapshot of price at order time"
         float   discount    "percentage 0–100 applied to this line"
         datetime created_at

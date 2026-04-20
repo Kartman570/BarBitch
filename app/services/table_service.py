@@ -72,14 +72,14 @@ class TableService:
         )
 
         # Items breakdown
-        item_agg: dict = defaultdict(lambda: {"quantity": 0.0, "revenue": 0.0})
+        item_agg: dict = defaultdict(lambda: {"quantity": 0, "revenue": 0.0})
         for o in orders:
             name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
             item_agg[name]["quantity"] += o.quantity
             item_agg[name]["revenue"] += line_total(o)
 
         items_sold = [
-            ItemStat(item_name=name, quantity=round(v["quantity"], 2), revenue=round(v["revenue"], 2))
+            ItemStat(item_name=name, quantity=v["quantity"], revenue=round(v["revenue"], 2))
             for name, v in sorted(item_agg.items(), key=lambda x: -x[1]["revenue"])
         ]
 
@@ -123,7 +123,7 @@ class TableService:
         item_ids = list({o.item_id for o in orders})
         items = {i.id: i for i in self.session.exec(select(Item).where(Item.id.in_(item_ids))).all()}
 
-        agg: dict = defaultdict(lambda: {"quantity": 0.0, "revenue": 0.0, "orders_count": 0})
+        agg: dict = defaultdict(lambda: {"quantity": 0, "revenue": 0.0, "orders_count": 0})
         for o in orders:
             name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
             lt = o.price * o.quantity * (1 - o.discount / 100)
@@ -135,7 +135,7 @@ class TableService:
         return [
             TopItemStat(
                 item_name=name,
-                quantity=round(v["quantity"], 2),
+                quantity=v["quantity"],
                 revenue=round(v["revenue"], 2),
                 orders_count=v["orders_count"],
             )

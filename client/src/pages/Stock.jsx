@@ -21,7 +21,7 @@ function AdjustCell({ item, t }) {
   })
 
   const apply = (sign) => {
-    const val = parseFloat(delta)
+    const val = parseInt(delta, 10)
     if (!delta || isNaN(val) || val <= 0) {
       setError(t('stock_invalid'))
       return
@@ -35,8 +35,8 @@ function AdjustCell({ item, t }) {
       <input
         className="input w-24 py-1 text-center"
         type="number"
-        min="0.1"
-        step="0.1"
+        min="1"
+        step="1"
         placeholder="0"
         value={delta}
         onChange={(e) => { setDelta(e.target.value); setError('') }}
@@ -164,7 +164,7 @@ export default function Stock() {
                               : 'text-green-400'
                           }`}
                         >
-                          {item.stock_qty % 1 === 0 ? item.stock_qty : item.stock_qty.toFixed(2)}
+                          {item.stock_qty}
                         </span>
                       ) : (
                         <span className="text-gray-600 text-sm">{t('stock_not_tracked')}</span>

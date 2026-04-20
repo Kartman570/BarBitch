@@ -18,7 +18,7 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
   const lineTotal = order.price * order.quantity * (1 - discount / 100)
 
   const handleSave = () => {
-    const newQty = parseFloat(qty)
+    const newQty = parseInt(qty, 10)
     if (newQty > 0 && newQty !== order.quantity) onUpdateQty(order.id, newQty)
     setEditing(false)
   }
@@ -32,8 +32,8 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
             <input
               className="input w-20 py-1 text-center"
               type="number"
-              min="0.1"
-              step="0.1"
+              min="1"
+              step="1"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
@@ -44,7 +44,7 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <span>{order.quantity % 1 === 0 ? order.quantity : order.quantity.toFixed(2)}</span>
+            <span>{order.quantity}</span>
             {isActive && (
               <button
                 onClick={() => { setQty(String(order.quantity)); setEditing(true) }}
@@ -113,7 +113,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
   }
 
   const discountVal = Math.min(100, Math.max(0, parseFloat(discount || 0)))
-  const subtotal = selected ? selected.price * parseFloat(qty || 0) * (1 - discountVal / 100) : 0
+  const subtotal = selected ? selected.price * parseInt(qty || 0, 10) * (1 - discountVal / 100) : 0
 
   return (
     <Modal open={open} onClose={handleClose} title={t('td_add_title')} size="md">
@@ -174,8 +174,8 @@ function AddOrderModal({ open, onClose, tableId, t }) {
                 <input
                   className="input"
                   type="number"
-                  min="0.1"
-                  step="0.1"
+                  min="1"
+                  step="1"
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
                   autoFocus
@@ -211,11 +211,11 @@ function AddOrderModal({ open, onClose, tableId, t }) {
               <button
                 onClick={() => addMutation.mutate({
                   itemId: selected.id,
-                  quantity: parseFloat(qty),
+                  quantity: parseInt(qty, 10),
                   discount: discountVal,
                 })}
                 className="btn-primary"
-                disabled={addMutation.isPending || !qty || parseFloat(qty) <= 0}
+                disabled={addMutation.isPending || !qty || parseInt(qty, 10) <= 0}
               >
                 {addMutation.isPending ? <Spinner className="text-gray-950" /> : null}
                 {t('add')}

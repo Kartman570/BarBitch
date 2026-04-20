@@ -9,7 +9,7 @@ import { CURRENCY } from '../currency'
 
 const EMPTY_FORM = { name: '', price: '', category: '', is_available: true, stock_qty: '' }
 
-function ItemForm({ initial = EMPTY_FORM, onSubmit, isPending, error, onCancel, t }) {
+function ItemForm({ initial = EMPTY_FORM, isEdit = false, onSubmit, isPending, error, onCancel, t }) {
   const [form, setForm] = useState(initial)
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
@@ -21,7 +21,7 @@ function ItemForm({ initial = EMPTY_FORM, onSubmit, isPending, error, onCancel, 
       price: parseFloat(form.price),
       category: form.category.trim() || null,
       is_available: form.is_available,
-      stock_qty: form.stock_qty !== '' ? parseFloat(form.stock_qty) : null,
+      ...(!isEdit && { stock_qty: form.stock_qty !== '' ? parseInt(form.stock_qty, 10) : null }),
     }
     onSubmit(payload)
   }
@@ -41,10 +41,12 @@ function ItemForm({ initial = EMPTY_FORM, onSubmit, isPending, error, onCancel, 
           <label className="label">{t('menu_form_category')}</label>
           <input className="input" placeholder={t('menu_form_category_placeholder')} value={form.category} onChange={set('category')} />
         </div>
-        <div>
-          <label className="label">{t('menu_form_stock')}</label>
-          <input className="input" type="number" min="0" step="0.1" placeholder={t('menu_form_stock_placeholder')} value={form.stock_qty} onChange={set('stock_qty')} />
-        </div>
+        {!isEdit && (
+          <div>
+            <label className="label">{t('menu_form_stock')}</label>
+            <input className="input" type="number" min="0" step="1" placeholder={t('menu_form_stock_placeholder')} value={form.stock_qty} onChange={set('stock_qty')} />
+          </div>
+        )}
         <div className="flex items-center gap-3 pt-6">
           <input
             id="is_available"
@@ -214,12 +216,12 @@ export default function Menu() {
         {modal && modal !== 'add' && (
           <ItemForm
             t={t}
+            isEdit
             initial={{
               name: modal.name,
               price: String(modal.price),
               category: modal.category ?? '',
               is_available: modal.is_available,
-              stock_qty: modal.stock_qty !== null ? String(modal.stock_qty) : '',
             }}
             onSubmit={(data) => updateMutation.mutate({ id: modal.id, data })}
             isPending={updateMutation.isPending}

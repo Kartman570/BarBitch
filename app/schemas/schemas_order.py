@@ -100,7 +100,7 @@ class ItemCreate(BaseModel):
     price: float = Field(gt=0)
     category: Optional[str] = None
     is_available: bool = True
-    stock_qty: Optional[float] = Field(default=None, ge=0)
+    stock_qty: Optional[int] = Field(default=None, ge=0)
 
 class ItemRead(BaseModel):
     id: int
@@ -108,7 +108,7 @@ class ItemRead(BaseModel):
     price: float
     category: Optional[str]
     is_available: bool
-    stock_qty: Optional[float] = None
+    stock_qty: Optional[int] = None
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -117,7 +117,7 @@ class ItemUpdate(BaseModel):
     is_available: Optional[bool] = None
 
 class StockAdjust(BaseModel):
-    delta: float  # positive = add stock, negative = remove stock
+    delta: int  # positive = add stock, negative = remove stock
 
 
 # ==== TABLE SCHEMAS ====
@@ -153,21 +153,21 @@ class TableReadDetailed(BaseModel):
 
 class OrderCreate(BaseModel):
     item_id: int
-    quantity: float = Field(default=1.0, gt=0)
+    quantity: int = Field(default=1, gt=0)
     discount: float = Field(default=0.0, ge=0, le=100)
 
 class OrderRead(BaseModel):
     id: int
     table_id: int
     item_id: int
-    quantity: float
+    quantity: int
     price: float
     discount: float
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class OrderUpdate(BaseModel):
-    quantity: float = Field(gt=0)
+    quantity: int = Field(gt=0)
 
 
 TableReadDetailed.model_rebuild()
@@ -177,7 +177,7 @@ TableReadDetailed.model_rebuild()
 
 class ItemStat(BaseModel):
     item_name: str
-    quantity: float
+    quantity: int
     revenue: float
 
 class OrderLogEntry(BaseModel):
@@ -185,7 +185,7 @@ class OrderLogEntry(BaseModel):
     created_at: datetime
     table_name: str
     item_name: str
-    quantity: float
+    quantity: int
     price: float
     discount: float
     line_total: float
@@ -202,6 +202,6 @@ class DailyStats(BaseModel):
 
 class TopItemStat(BaseModel):
     item_name: str
-    quantity: float
+    quantity: int
     revenue: float
     orders_count: int

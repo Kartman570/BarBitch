@@ -54,7 +54,7 @@ class Item(SQLModel, table=True):
     price: float
     category: str | None = Field(default=None)
     is_available: bool = Field(default=True)
-    stock_qty: float | None = Field(default=None)  # None = not tracked, >= 0 = current stock
+    stock_qty: int | None = Field(default=None)  # None = not tracked, >= 0 = current stock
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -82,7 +82,7 @@ class Order(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     table_id: int = Field(foreign_key="tables.id", index=True)
     item_id: int = Field(foreign_key="items.id", index=True)
-    quantity: float = Field(default=1.0)
+    quantity: int = Field(default=1)
     price: float  # snapshot of item.price at order time
     discount: float = Field(default=0.0)  # percentage 0–100 applied to this line
     created_at: datetime = Field(default_factory=datetime.now)
