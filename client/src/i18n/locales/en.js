@@ -73,6 +73,9 @@ export default {
   td_items_one: 'item',
   td_items_few: 'items',
   td_items_many: 'items',
+  td_rename_label: 'Rename table',
+  td_col_discount: 'Disc.',
+  td_discount_label: 'Discount %',
 
   // === MENU ===
   menu_title: 'Menu',
@@ -129,6 +132,13 @@ export default {
   stats_col_qty: 'Qty',
   stats_col_total: 'Total',
   stats_empty: 'No data for {{date}}',
+  stats_date_from: 'From',
+  stats_date_to: 'To',
+  stats_top_title: 'Top items',
+  stats_top_col_qty: 'Qty',
+  stats_top_col_orders: 'Orders',
+  stats_top_col_revenue: 'Revenue',
+  stats_top_empty: 'No data for selected period',
 
   // === USERS ===
   users_title: 'Staff',
@@ -194,4 +204,15 @@ export default {
   action_user_created: 'User created',
   action_user_updated: 'User updated',
   action_user_deleted: 'User deleted',
+  action_table_created: 'Table opened',
+  action_table_renamed: 'Table renamed',
+  action_table_closed: 'Table closed',
+  action_table_deleted: 'Table deleted',
+  action_item_created: 'Item created',
+  action_item_updated: 'Item updated',
+  action_item_deleted: 'Item deleted',
+  action_stock_adjusted: 'Stock adjusted',
+  action_order_added: 'Order added',
+  action_order_updated: 'Order updated',
+  action_order_deleted: 'Order deleted',
 }

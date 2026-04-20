@@ -73,6 +73,9 @@ export default {
   td_items_one: 'позиция',
   td_items_few: 'позиции',
   td_items_many: 'позиций',
+  td_rename_label: 'Переименовать стол',
+  td_col_discount: 'Скидка',
+  td_discount_label: 'Скидка %',
 
   // === MENU ===
   menu_title: 'Меню',
@@ -129,6 +132,13 @@ export default {
   stats_col_qty: 'Кол-во',
   stats_col_total: 'Сумма',
   stats_empty: 'Нет данных за {{date}}',
+  stats_date_from: 'С',
+  stats_date_to: 'По',
+  stats_top_title: 'Топ позиций',
+  stats_top_col_qty: 'Кол-во',
+  stats_top_col_orders: 'Заказов',
+  stats_top_col_revenue: 'Выручка',
+  stats_top_empty: 'Нет данных за выбранный период',
 
   // === USERS ===
   users_title: 'Персонал',
@@ -194,4 +204,15 @@ export default {
   action_user_created: 'Пользователь создан',
   action_user_updated: 'Пользователь изменён',
   action_user_deleted: 'Пользователь удалён',
+  action_table_created: 'Стол открыт',
+  action_table_renamed: 'Стол переименован',
+  action_table_closed: 'Стол закрыт',
+  action_table_deleted: 'Стол удалён',
+  action_item_created: 'Позиция создана',
+  action_item_updated: 'Позиция изменена',
+  action_item_deleted: 'Позиция удалена',
+  action_stock_adjusted: 'Склад скорректирован',
+  action_order_added: 'Заказ добавлен',
+  action_order_updated: 'Заказ изменён',
+  action_order_deleted: 'Заказ удалён',
 }

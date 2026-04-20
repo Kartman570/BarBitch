@@ -14,6 +14,8 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
   const [editing, setEditing] = useState(false)
   const [qty, setQty] = useState(String(order.quantity))
   const item = itemsMap[order.item_id]
+  const discount = order.discount ?? 0
+  const lineTotal = order.price * order.quantity * (1 - discount / 100)
 
   const handleSave = () => {
     const newQty = parseFloat(qty)
@@ -55,7 +57,12 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
         )}
       </td>
       <td>{order.price.toFixed(2)} {CURRENCY}</td>
-      <td className="font-medium text-amber-400">{(order.price * order.quantity).toFixed(2)} {CURRENCY}</td>
+      <td>
+        {discount > 0
+          ? <span className="text-xs text-green-400">−{discount}%</span>
+          : <span className="text-gray-600">—</span>}
+      </td>
+      <td className="font-medium text-amber-400">{lineTotal.toFixed(2)} {CURRENCY}</td>
       <td>
         {isActive && (
           <button
@@ -74,6 +81,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [qty, setQty] = useState('1')
+  const [discount, setDiscount] = useState('0')
   const qc = useQueryClient()
 
   const { data: items = [] } = useQuery({
@@ -88,8 +96,8 @@ function AddOrderModal({ open, onClose, tableId, t }) {
   )
 
   const addMutation = useMutation({
-    mutationFn: ({ itemId, quantity }) =>
-      api.post(`/tables/${tableId}/orders/`, { item_id: itemId, quantity }),
+    mutationFn: ({ itemId, quantity, discount }) =>
+      api.post(`/tables/${tableId}/orders/`, { item_id: itemId, quantity, discount }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['table', tableId] })
       handleClose()
@@ -100,8 +108,12 @@ function AddOrderModal({ open, onClose, tableId, t }) {
     setSearch('')
     setSelected(null)
     setQty('1')
+    setDiscount('0')
     onClose()
   }
+
+  const discountVal = Math.min(100, Math.max(0, parseFloat(discount || 0)))
+  const subtotal = selected ? selected.price * parseFloat(qty || 0) * (1 - discountVal / 100) : 0
 
   return (
     <Modal open={open} onClose={handleClose} title={t('td_add_title')} size="md">
@@ -156,23 +168,39 @@ function AddOrderModal({ open, onClose, tableId, t }) {
                 <X size={16} />
               </button>
             </div>
-            <div>
-              <label className="label">{t('td_quantity_label')}</label>
-              <input
-                className="input"
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                autoFocus
-              />
-              {qty && selected && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {t('td_subtotal_label')}: {(selected.price * parseFloat(qty || 0)).toFixed(2)} {CURRENCY}
-                </p>
-              )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">{t('td_quantity_label')}</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="label">{t('td_discount_label')}</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
+            {qty && selected && (
+              <p className="text-xs text-gray-500">
+                {t('td_subtotal_label')}: {subtotal.toFixed(2)} {CURRENCY}
+                {discountVal > 0 && <span className="text-green-400 ml-1">(−{discountVal}%)</span>}
+              </p>
+            )}
             {addMutation.error && (
               <p className="text-red-400 text-sm">
                 {addMutation.error.response?.data?.detail ?? t('error')}
@@ -181,7 +209,11 @@ function AddOrderModal({ open, onClose, tableId, t }) {
             <div className="flex gap-2 justify-end">
               <button onClick={handleClose} className="btn-secondary">{t('cancel')}</button>
               <button
-                onClick={() => addMutation.mutate({ itemId: selected.id, quantity: parseFloat(qty) })}
+                onClick={() => addMutation.mutate({
+                  itemId: selected.id,
+                  quantity: parseFloat(qty),
+                  discount: discountVal,
+                })}
                 className="btn-primary"
                 disabled={addMutation.isPending || !qty || parseFloat(qty) <= 0}
               >
@@ -202,6 +234,8 @@ export default function TableDetail() {
   const qc = useQueryClient()
   const [addOpen, setAddOpen] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [newName, setNewName] = useState('')
   const t = useT()
   const dateLocale = useDateLocale()
 
@@ -241,6 +275,15 @@ export default function TableDetail() {
     },
   })
 
+  const renameMutation = useMutation({
+    mutationFn: (name) => api.patch(`/tables/${id}`, { table_name: name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['table', id] })
+      qc.invalidateQueries({ queryKey: ['tables'] })
+      setRenaming(false)
+    },
+  })
+
   const downloadReceipt = () => {
     api
       .get(`/tables/${id}/receipt`, { responseType: 'blob' })
@@ -271,7 +314,10 @@ export default function TableDetail() {
 
   const isActive = table.status === 'Active'
   const orders = table.orders ?? []
-  const total = orders.reduce((sum, o) => sum + o.price * o.quantity, 0)
+  const total = orders.reduce((sum, o) => {
+    const discount = o.discount ?? 0
+    return sum + o.price * o.quantity * (1 - discount / 100)
+  }, 0)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -282,10 +328,48 @@ export default function TableDetail() {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-100 truncate">{table.table_name}</h1>
-            {isActive
-              ? <span className="badge-green">{t('status_active')}</span>
-              : <span className="badge-gray">{t('status_closed')}</span>}
+            {renaming ? (
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  className="input text-xl font-bold py-1 flex-1"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newName.trim()) renameMutation.mutate(newName.trim())
+                    if (e.key === 'Escape') setRenaming(false)
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => newName.trim() && renameMutation.mutate(newName.trim())}
+                  disabled={renameMutation.isPending || !newName.trim()}
+                  className="btn-ghost p-1.5 text-green-400"
+                >
+                  <Check size={16} />
+                </button>
+                <button onClick={() => setRenaming(false)} className="btn-ghost p-1.5 text-gray-500">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-gray-100 truncate">{table.table_name}</h1>
+                {isActive && (
+                  <button
+                    onClick={() => { setNewName(table.table_name); setRenaming(true) }}
+                    className="btn-ghost p-1.5 text-gray-500 hover:text-gray-300 shrink-0"
+                    title={t('td_rename_label')}
+                  >
+                    <Edit2 size={15} />
+                  </button>
+                )}
+              </>
+            )}
+            {!renaming && (
+              isActive
+                ? <span className="badge-green shrink-0">{t('status_active')}</span>
+                : <span className="badge-gray shrink-0">{t('status_closed')}</span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
             {t('td_opened')}: {new Date(table.created_at).toLocaleString(dateLocale)}
@@ -334,6 +418,7 @@ export default function TableDetail() {
                   <th>{t('td_col_item')}</th>
                   <th>{t('td_col_qty')}</th>
                   <th>{t('td_col_price')}</th>
+                  <th>{t('td_col_discount')}</th>
                   <th>{t('td_col_total')}</th>
                   <th style={{ width: 48 }} />
                 </tr>

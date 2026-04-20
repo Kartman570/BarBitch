@@ -73,6 +73,9 @@ export default {
   td_items_one: 'პოზიცია',
   td_items_few: 'პოზიცია',
   td_items_many: 'პოზიცია',
+  td_rename_label: 'მაგიდის გადარქმევა',
+  td_col_discount: 'ფასდ.',
+  td_discount_label: 'ფასდაკლება %',
 
   // === MENU ===
   menu_title: 'მენიუ',
@@ -129,6 +132,13 @@ export default {
   stats_col_qty: 'რაოდ.',
   stats_col_total: 'ჯამი',
   stats_empty: '{{date}}-ის მონაცემები არ არის',
+  stats_date_from: 'დან',
+  stats_date_to: 'მდე',
+  stats_top_title: 'საუკეთესო პოზიციები',
+  stats_top_col_qty: 'რაოდ.',
+  stats_top_col_orders: 'შეკ.',
+  stats_top_col_revenue: 'შემოსავ.',
+  stats_top_empty: 'არჩეული პერიოდის მონაცემები არ არის',
 
   // === USERS ===
   users_title: 'პერსონალი',
@@ -194,4 +204,15 @@ export default {
   action_user_created: 'მომხმარებელი შეიქმნა',
   action_user_updated: 'მომხმარებელი განახლდა',
   action_user_deleted: 'მომხმარებელი წაიშალა',
+  action_table_created: 'მაგიდა გახსნილია',
+  action_table_renamed: 'მაგიდა გადარქმეულია',
+  action_table_closed: 'მაგიდა დახურულია',
+  action_table_deleted: 'მაგიდა წაშლილია',
+  action_item_created: 'პოზიცია შეიქმნა',
+  action_item_updated: 'პოზიცია განახლდა',
+  action_item_deleted: 'პოზიცია წაიშალა',
+  action_stock_adjusted: 'საწყობი კორექტირებულია',
+  action_order_added: 'შეკვეთა დამატებულია',
+  action_order_updated: 'შეკვეთა განახლდა',
+  action_order_deleted: 'შეკვეთა წაიშალა',
 }

@@ -3,8 +3,8 @@ from datetime import date, datetime, timedelta
 from sqlmodel import select
 from models.models import Item, Order, Table
 from schemas.schemas_order import (
-    TableCreate, TableRead, TableReadDetailed, OrderCreate, OrderRead,
-    DailyStats, ItemStat, OrderLogEntry,
+    TableCreate, OrderCreate, OrderRead,
+    DailyStats, ItemStat, OrderLogEntry, TopItemStat,
 )
 
 
@@ -23,7 +23,7 @@ class TableService:
         if table.status == "Closed":
             raise ValueError("Table is already closed")
         orders = self.session.exec(select(Order).where(Order.table_id == table.id)).all()
-        table.total = sum(o.price * o.quantity for o in orders)
+        table.total = sum(o.price * o.quantity * (1 - o.discount / 100) for o in orders)
         table.status = "Closed"
         table.closed_at = datetime.now()
         table.updated_at = datetime.now()
@@ -32,17 +32,25 @@ class TableService:
         self.session.refresh(table)
         return table
 
-    def daily_stats(self, target_date: date) -> DailyStats:
-        start = datetime.combine(target_date, datetime.min.time())
-        end = start + timedelta(days=1)
+    def daily_stats(self, date_from: date, date_to: date | None = None) -> DailyStats:
+        if date_to is None:
+            date_to = date_from
+        start = datetime.combine(date_from, datetime.min.time())
+        end = datetime.combine(date_to + timedelta(days=1), datetime.min.time())
 
         orders = self.session.exec(
             select(Order).where(Order.created_at >= start, Order.created_at < end)
         ).all()
 
+        date_str = (
+            date_from.isoformat()
+            if date_from == date_to
+            else f"{date_from.isoformat()} / {date_to.isoformat()}"
+        )
+
         if not orders:
             return DailyStats(
-                date=target_date.isoformat(),
+                date=date_str,
                 revenue_total=0.0, revenue_locked=0.0, revenue_running=0.0,
                 orders_count=0, tables_served=0, items_sold=[], orders_log=[],
             )
@@ -53,10 +61,13 @@ class TableService:
         items = {i.id: i for i in self.session.exec(select(Item).where(Item.id.in_(item_ids))).all()}
         tables = {t.id: t for t in self.session.exec(select(Table).where(Table.id.in_(table_ids))).all()}
 
+        def line_total(o: Order) -> float:
+            return o.price * o.quantity * (1 - o.discount / 100)
+
         # Revenue split
-        revenue_total = sum(o.price * o.quantity for o in orders)
+        revenue_total = sum(line_total(o) for o in orders)
         revenue_locked = sum(
-            o.price * o.quantity for o in orders
+            line_total(o) for o in orders
             if tables.get(o.table_id) and tables[o.table_id].status == "Closed"
         )
 
@@ -65,7 +76,7 @@ class TableService:
         for o in orders:
             name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
             item_agg[name]["quantity"] += o.quantity
-            item_agg[name]["revenue"] += o.price * o.quantity
+            item_agg[name]["revenue"] += line_total(o)
 
         items_sold = [
             ItemStat(item_name=name, quantity=round(v["quantity"], 2), revenue=round(v["revenue"], 2))
@@ -81,13 +92,14 @@ class TableService:
                 item_name=items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}",
                 quantity=o.quantity,
                 price=o.price,
-                line_total=round(o.price * o.quantity, 2),
+                discount=o.discount,
+                line_total=round(line_total(o), 2),
             )
             for o in orders
         ], key=lambda e: e.created_at)
 
         return DailyStats(
-            date=target_date.isoformat(),
+            date=date_str,
             revenue_total=round(revenue_total, 2),
             revenue_locked=round(revenue_locked, 2),
             revenue_running=round(revenue_total - revenue_locked, 2),
@@ -96,6 +108,39 @@ class TableService:
             items_sold=items_sold,
             orders_log=orders_log,
         )
+
+    def top_items(self, date_from: date, date_to: date, limit: int = 10) -> list[TopItemStat]:
+        start = datetime.combine(date_from, datetime.min.time())
+        end = datetime.combine(date_to + timedelta(days=1), datetime.min.time())
+
+        orders = self.session.exec(
+            select(Order).where(Order.created_at >= start, Order.created_at < end)
+        ).all()
+
+        if not orders:
+            return []
+
+        item_ids = list({o.item_id for o in orders})
+        items = {i.id: i for i in self.session.exec(select(Item).where(Item.id.in_(item_ids))).all()}
+
+        agg: dict = defaultdict(lambda: {"quantity": 0.0, "revenue": 0.0, "orders_count": 0})
+        for o in orders:
+            name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
+            lt = o.price * o.quantity * (1 - o.discount / 100)
+            agg[name]["quantity"] += o.quantity
+            agg[name]["revenue"] += lt
+            agg[name]["orders_count"] += 1
+
+        sorted_items = sorted(agg.items(), key=lambda x: -x[1]["revenue"])[:limit]
+        return [
+            TopItemStat(
+                item_name=name,
+                quantity=round(v["quantity"], 2),
+                revenue=round(v["revenue"], 2),
+                orders_count=v["orders_count"],
+            )
+            for name, v in sorted_items
+        ]
 
     def add_order(self, table: Table, data: OrderCreate) -> Order:
         if table.status == "Closed":
@@ -116,7 +161,8 @@ class TableService:
             table_id=table.id,
             item_id=data.item_id,
             quantity=data.quantity,
-            price=item.price,  # price snapshot
+            price=item.price,
+            discount=data.discount,
         )
         self.session.add(order)
         table.updated_at = datetime.now()

@@ -35,7 +35,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     # In production set CORS_ORIGINS env var or tighten this list
-    allow_origins=["http://localhost:8501"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"],

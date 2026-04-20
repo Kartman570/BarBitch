@@ -58,7 +58,15 @@ function UserForm({ initial = EMPTY_FORM, roles, onSubmit, isPending, error, onC
         </select>
       </div>
       {error && (
-        <p className="text-red-400 text-sm">{error.response?.data?.detail ?? t('error')}</p>
+        <p className="text-red-400 text-sm">{
+          (() => {
+            const d = error?.response?.data?.detail
+            if (!d) return t('error')
+            if (typeof d === 'string') return d
+            if (Array.isArray(d)) return d.map((e) => e.msg).join('; ')
+            return t('error')
+          })()
+        }</p>
       )}
       <div className="flex gap-2 justify-end">
         <button type="button" onClick={onCancel} className="btn-secondary">{t('cancel')}</button>

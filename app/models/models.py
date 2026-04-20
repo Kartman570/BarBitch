@@ -84,6 +84,7 @@ class Order(SQLModel, table=True):
     item_id: int = Field(foreign_key="items.id", index=True)
     quantity: float = Field(default=1.0)
     price: float  # snapshot of item.price at order time
+    discount: float = Field(default=0.0)  # percentage 0–100 applied to this line
     created_at: datetime = Field(default_factory=datetime.now)
 
     table: Table = Relationship(back_populates="orders")

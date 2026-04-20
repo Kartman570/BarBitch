@@ -9,25 +9,39 @@ const ACTION_KEYS = [
   'login_success', 'login_failure', 'logout',
   'role_created', 'role_updated', 'role_deleted',
   'user_created', 'user_updated', 'user_deleted',
+  'table_created', 'table_renamed', 'table_closed', 'table_deleted',
+  'item_created', 'item_updated', 'item_deleted',
+  'stock_adjusted',
+  'order_added', 'order_updated', 'order_deleted',
 ]
 
 const ACTION_COLORS = {
-  login_success: 'badge-green',
-  login_failure: 'badge-red',
-  logout:        'badge-gray',
-  role_created:  'badge-amber',
-  role_updated:  'badge-amber',
-  role_deleted:  'badge-red',
-  user_created:  'badge-amber',
-  user_updated:  'badge-amber',
-  user_deleted:  'badge-red',
+  login_success:  'badge-green',
+  login_failure:  'badge-red',
+  logout:         'badge-gray',
+  role_created:   'badge-amber',
+  role_updated:   'badge-amber',
+  role_deleted:   'badge-red',
+  user_created:   'badge-amber',
+  user_updated:   'badge-amber',
+  user_deleted:   'badge-red',
+  table_created:  'badge-green',
+  table_renamed:  'badge-amber',
+  table_closed:   'badge-gray',
+  table_deleted:  'badge-red',
+  item_created:   'badge-amber',
+  item_updated:   'badge-amber',
+  item_deleted:   'badge-red',
+  stock_adjusted: 'badge-amber',
+  order_added:    'badge-green',
+  order_updated:  'badge-amber',
+  order_deleted:  'badge-red',
 }
 
 function ActionBadge({ action, t }) {
   const color = ACTION_COLORS[action]
   const label = t(`action_${action}`)
-  if (color) return <span className={color}>{label}</span>
-  return <span className="badge-gray text-xs">{action}</span>
+  return <span className={color ?? 'badge-gray'}>{label}</span>
 }
 
 export default function Audit() {

@@ -154,6 +154,7 @@ class TableReadDetailed(BaseModel):
 class OrderCreate(BaseModel):
     item_id: int
     quantity: float = Field(default=1.0, gt=0)
+    discount: float = Field(default=0.0, ge=0, le=100)
 
 class OrderRead(BaseModel):
     id: int
@@ -161,6 +162,7 @@ class OrderRead(BaseModel):
     item_id: int
     quantity: float
     price: float
+    discount: float
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -185,6 +187,7 @@ class OrderLogEntry(BaseModel):
     item_name: str
     quantity: float
     price: float
+    discount: float
     line_total: float
 
 class DailyStats(BaseModel):
@@ -196,3 +199,9 @@ class DailyStats(BaseModel):
     tables_served: int
     items_sold: List[ItemStat]
     orders_log: List[OrderLogEntry]
+
+class TopItemStat(BaseModel):
+    item_name: str
+    quantity: float
+    revenue: float
+    orders_count: int

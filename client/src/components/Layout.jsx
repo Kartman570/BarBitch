@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   LayoutGrid,
   UtensilsCrossed,
@@ -36,6 +36,8 @@ export default function Layout() {
   const lang = useLangStore((s) => s.lang)
   const setLang = useLangStore((s) => s.setLang)
 
+  const perms = user?.permissions ?? []
+
   const logoutMutation = useMutation({
     mutationFn: () => api.post('/auth/logout', { refresh_token: refreshToken }),
     onSettled: () => {
@@ -44,7 +46,17 @@ export default function Layout() {
     },
   })
 
-  const perms = user?.permissions ?? []
+  // Low-stock badge: count items with stock_qty <= 3 (only when user has stock perm)
+  const { data: lowStockCount = 0 } = useQuery({
+    queryKey: ['items', 'low-stock-count'],
+    queryFn: () =>
+      api.get('/items/').then((r) =>
+        r.data.filter((i) => i.stock_qty !== null && i.stock_qty <= 3).length
+      ),
+    enabled: perms.includes('stock'),
+    refetchInterval: 60_000,
+  })
+
   const visibleNav = NAV_KEYS.filter((item) => perms.includes(item.perm))
 
   const linkClass = ({ isActive }) =>
@@ -64,10 +76,15 @@ export default function Layout() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {visibleNav.map(({ to, tKey, icon: Icon }) => (
+        {visibleNav.map(({ to, tKey, icon: Icon, perm }) => (
           <NavLink key={to} to={to} className={linkClass} onClick={() => setSidebarOpen(false)}>
             <Icon size={18} className="shrink-0" />
-            {t(tKey)}
+            <span className="flex-1">{t(tKey)}</span>
+            {perm === 'stock' && lowStockCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {lowStockCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

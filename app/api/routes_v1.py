@@ -14,7 +14,7 @@ from schemas.schemas_order import (
     ItemCreate, ItemRead, ItemUpdate, StockAdjust,
     OrderCreate, OrderRead, OrderUpdate,
     TableCreate, TableRead, TableUpdate, TableReadDetailed,
-    DailyStats, AuditEventRead,
+    DailyStats, AuditEventRead, TopItemStat,
 )
 from core.database import SessionDep
 from core.config import settings
@@ -307,9 +307,11 @@ def delete_user(user_id: int, session: SessionDep, actor: Annotated[User, _perm(
 # ── Items ──────────────────────────────────────────────────────────────────────
 
 @router.post("/items/", response_model=ItemRead, tags=["items"])
-def create_item(data: ItemCreate, session: SessionDep, _: Annotated[User, _perm("items")]):
+def create_item(data: ItemCreate, session: SessionDep, actor: Annotated[User, _perm("items")]):
     item = Item(**data.model_dump())
     session.add(item)
+    session.flush()
+    _audit(session, "item_created", user=actor, resource_id=item.id)
     session.commit()
     session.refresh(item)
     return item
@@ -322,6 +324,8 @@ def list_items(
     name: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     available_only: bool = Query(False),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
 ):
     q = select(Item)
     if name:
@@ -330,7 +334,7 @@ def list_items(
         q = q.where(Item.category == category)
     if available_only:
         q = q.where(Item.is_available == True)
-    return session.exec(q).all()
+    return session.exec(q.offset(skip).limit(limit)).all()
 
 
 @router.get("/items/{item_id}", response_model=ItemRead, tags=["items"])
@@ -342,7 +346,7 @@ def get_item(item_id: int, session: SessionDep, _: Annotated[User, _perm("items"
 
 
 @router.put("/items/{item_id}", response_model=ItemRead, tags=["items"])
-def update_item(item_id: int, data: ItemUpdate, session: SessionDep, _: Annotated[User, _perm("items")]):
+def update_item(item_id: int, data: ItemUpdate, session: SessionDep, actor: Annotated[User, _perm("items")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -350,23 +354,25 @@ def update_item(item_id: int, data: ItemUpdate, session: SessionDep, _: Annotate
         setattr(item, field, value)
     item.updated_at = datetime.now()
     session.add(item)
+    _audit(session, "item_updated", user=actor, resource_id=item_id)
     session.commit()
     session.refresh(item)
     return item
 
 
 @router.delete("/items/{item_id}", tags=["items"])
-def delete_item(item_id: int, session: SessionDep, _: Annotated[User, _perm("items")]):
+def delete_item(item_id: int, session: SessionDep, actor: Annotated[User, _perm("items")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
+    _audit(session, "item_deleted", user=actor, resource_id=item_id)
     session.delete(item)
     session.commit()
     return {"message": "Item deleted"}
 
 
 @router.patch("/items/{item_id}/stock", response_model=ItemRead, tags=["items"])
-def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: Annotated[User, _perm("stock")]):
+def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, actor: Annotated[User, _perm("stock")]):
     item = session.get(Item, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -378,6 +384,7 @@ def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: Annota
     item.stock_qty = new_qty
     item.updated_at = datetime.now()
     session.add(item)
+    _audit(session, "stock_adjusted", user=actor, resource_id=item_id)
     session.commit()
     session.refresh(item)
     return item
@@ -386,8 +393,10 @@ def adjust_stock(item_id: int, data: StockAdjust, session: SessionDep, _: Annota
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
 @router.post("/tables/", response_model=TableRead, tags=["tables"])
-def create_table(data: TableCreate, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def create_table(data: TableCreate, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     table = TableService(session).create_table(data)
+    _audit(session, "table_created", user=actor, resource_id=table.id)
+    session.commit()
     return table
 
 
@@ -397,6 +406,8 @@ def list_tables(
     _: Annotated[User, _perm("tables")],
     status: Optional[str] = Query(None, description="Filter by status: Active | Closed"),
     date: Optional[str] = Query(None, description="Filter closed tables by date YYYY-MM-DD"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
 ):
     from datetime import timedelta as _td
     q = select(Table)
@@ -411,7 +422,7 @@ def list_tables(
         day_end = day_start + _td(days=1)
         q = q.where(Table.closed_at >= day_start).where(Table.closed_at < day_end)
     q = q.order_by(Table.created_at.desc())
-    return session.exec(q).all()
+    return session.exec(q.offset(skip).limit(limit)).all()
 
 
 @router.get("/tables/{table_id}", response_model=TableReadDetailed, tags=["tables"])
@@ -423,7 +434,7 @@ def get_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tabl
 
 
 @router.patch("/tables/{table_id}", response_model=TableRead, tags=["tables"])
-def update_table(table_id: int, data: TableUpdate, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def update_table(table_id: int, data: TableUpdate, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -431,13 +442,14 @@ def update_table(table_id: int, data: TableUpdate, session: SessionDep, _: Annot
         setattr(table, field, value)
     table.updated_at = datetime.now()
     session.add(table)
+    _audit(session, "table_renamed", user=actor, resource_id=table_id)
     session.commit()
     session.refresh(table)
     return table
 
 
 @router.post("/tables/{table_id}/close", response_model=TableRead, tags=["tables"])
-def close_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def close_table(table_id: int, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -445,6 +457,8 @@ def close_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("ta
         table = TableService(session).close_table(table)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    _audit(session, "table_closed", user=actor, resource_id=table_id)
+    session.commit()
     return table
 
 
@@ -466,10 +480,11 @@ def get_receipt(table_id: int, session: SessionDep, _: Annotated[User, _perm("ta
 
 
 @router.delete("/tables/{table_id}", tags=["tables"])
-def delete_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def delete_table(table_id: int, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
+    _audit(session, "table_deleted", user=actor, resource_id=table_id)
     session.delete(table)
     session.commit()
     return {"message": "Table deleted"}
@@ -478,7 +493,7 @@ def delete_table(table_id: int, session: SessionDep, _: Annotated[User, _perm("t
 # ── Orders (nested under tables) ───────────────────────────────────────────────
 
 @router.post("/tables/{table_id}/orders/", response_model=OrderRead, tags=["orders"])
-def add_order(table_id: int, data: OrderCreate, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def add_order(table_id: int, data: OrderCreate, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     table = session.get(Table, table_id)
     if table is None:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -488,6 +503,8 @@ def add_order(table_id: int, data: OrderCreate, session: SessionDep, _: Annotate
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    _audit(session, "order_added", user=actor, resource_id=order.id)
+    session.commit()
     return order
 
 
@@ -509,41 +526,39 @@ def get_order(table_id: int, order_id: int, session: SessionDep, _: Annotated[Us
 
 
 @router.patch("/tables/{table_id}/orders/{order_id}", response_model=OrderRead, tags=["orders"])
-def update_order(table_id: int, order_id: int, data: OrderUpdate, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def update_order(table_id: int, order_id: int, data: OrderUpdate, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Calculate quantity delta
     quantity_delta = data.quantity - order.quantity
 
-    # Adjust stock if item has stock tracking
     if quantity_delta != 0:
         item = session.get(Item, order.item_id)
         if item and item.stock_qty is not None:
-            # Quantity increased: deduct more stock
             if quantity_delta > 0:
                 if item.stock_qty < quantity_delta:
                     raise HTTPException(status_code=400, detail=f"Insufficient stock for {item.name}. Available: {item.stock_qty}, Need: {quantity_delta}")
                 item.stock_qty -= quantity_delta
-            # Quantity decreased: restore stock
             else:
-                item.stock_qty -= quantity_delta  # subtract negative number = add
+                item.stock_qty -= quantity_delta
             item.updated_at = datetime.now()
             session.add(item)
 
     order.quantity = data.quantity
     session.add(order)
+    _audit(session, "order_updated", user=actor, resource_id=order_id)
     session.commit()
     session.refresh(order)
     return order
 
 
 @router.delete("/tables/{table_id}/orders/{order_id}", tags=["orders"])
-def delete_order(table_id: int, order_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
+def delete_order(table_id: int, order_id: int, session: SessionDep, actor: Annotated[User, _perm("tables")]):
     order = session.get(Order, order_id)
     if order is None or order.table_id != table_id:
         raise HTTPException(status_code=404, detail="Order not found")
+    _audit(session, "order_deleted", user=actor, resource_id=order_id)
     session.delete(order)
     session.commit()
     return {"message": "Order deleted"}
@@ -551,20 +566,42 @@ def delete_order(table_id: int, order_id: int, session: SessionDep, _: Annotated
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
+def _parse_date(s: str) -> date_type:
+    try:
+        return date_type.fromisoformat(s)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+
 @router.get("/stats/daily", response_model=DailyStats, tags=["stats"])
 def daily_stats(
     session: SessionDep,
     _: Annotated[User, _perm("stats")],
-    date: Optional[str] = Query(None, description="Date YYYY-MM-DD, defaults to today"),
+    date: Optional[str] = Query(None, description="Single date YYYY-MM-DD (defaults to today)"),
+    date_from: Optional[str] = Query(None, description="Range start YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="Range end YYYY-MM-DD"),
 ):
-    if date:
-        try:
-            target = date_type.fromisoformat(date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    if date_from:
+        from_date = _parse_date(date_from)
+        to_date = _parse_date(date_to) if date_to else from_date
+    elif date:
+        from_date = to_date = _parse_date(date)
     else:
-        target = date_type.today()
-    return TableService(session).daily_stats(target)
+        from_date = to_date = date_type.today()
+    return TableService(session).daily_stats(from_date, to_date)
+
+
+@router.get("/stats/top-items", response_model=list[TopItemStat], tags=["stats"])
+def top_items(
+    session: SessionDep,
+    _: Annotated[User, _perm("stats")],
+    date_from: Optional[str] = Query(None, description="Range start YYYY-MM-DD (default: 30 days ago)"),
+    date_to: Optional[str] = Query(None, description="Range end YYYY-MM-DD (default: today)"),
+    limit: int = Query(10, ge=1, le=100),
+):
+    to_date = _parse_date(date_to) if date_to else date_type.today()
+    from_date = _parse_date(date_from) if date_from else to_date - timedelta(days=30)
+    return TableService(session).top_items(from_date, to_date, limit)
 
 
 # ── Audit log ──────────────────────────────────────────────────────────────────
@@ -575,8 +612,9 @@ def list_audit_events(
     _: Annotated[User, _perm("roles")],
     action: Optional[str] = Query(None, description="Filter by action"),
     limit: int = Query(100, le=500),
+    skip: int = Query(0, ge=0),
 ):
-    q = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    q = select(AuditEvent).order_by(AuditEvent.created_at.desc())
     if action:
         q = q.where(AuditEvent.action == action)
-    return session.exec(q).all()
+    return session.exec(q.offset(skip).limit(limit)).all()
