@@ -113,6 +113,7 @@ export default function Audit() {
                     {new Date(e.created_at).toLocaleString(dateLocale, {
                       day: '2-digit', month: '2-digit',
                       hour: '2-digit', minute: '2-digit', second: '2-digit',
+                      hour12: false,
                     })}
                   </td>
                   <td>{e.username ?? <span className="text-gray-600">—</span>}</td>

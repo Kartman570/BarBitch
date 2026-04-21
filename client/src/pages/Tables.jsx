@@ -29,6 +29,7 @@ function TableCard({ table, onClick, t, dateLocale }) {
           {new Date(isActive ? table.created_at : table.closed_at).toLocaleTimeString(dateLocale, {
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
           })}
         </span>
       </div>

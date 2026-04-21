@@ -44,6 +44,7 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 4**   | Bill / receipt export (PDF)    | ✅ Done         |
 | **Phase 4**   | WebSocket Real-time            | ❌ Planned      |
 | **Phase 5**   | Audit Logging                  | ✅ Done         |
+| **Phase 5**   | Discount Policy System         | ✅ Done         |
 | **Phase 6**   | Payment Processing             | ❌ Planned      |
 
 
@@ -133,9 +134,9 @@ app/
   main.py                  FastAPI entry point
   api/
     router.py              mounts sub-routers under /api
-    routes_v1.py           active v1 endpoints (auth, roles, users, items, tables, orders, stats)
+    routes_v1.py           active v1 endpoints (auth, roles, users, items, tables, orders, stats, discounts)
   models/
-    models.py              SQLModel table definitions (Role, User, Item, Table, Order)
+    models.py              SQLModel table definitions (Role, User, Item, Table, Order, DiscountPolicy)
   schemas/
     schemas_order.py       Pydantic request/response schemas
   services/
@@ -188,6 +189,7 @@ All endpoints are versioned under `/api/v1/`. All routes except login require `A
 | Receipt        | `GET /api/v1/tables/{id}/receipt` → PDF download (A6, Unicode) |
 | Orders         | CRUD `/api/v1/tables/{id}/orders/` (nested; deducts stock on create) |
 | Daily stats    | `GET /api/v1/stats/daily?date=YYYY-MM-DD` |
+| Discounts      | CRUD `/api/v1/discounts/` (requires `discounts` permission); `GET /discounts/for-item/{id}` returns active policy for barmen |
 | Audit log      | `GET /api/v1/audit/events` (requires `roles` permission) |
 
 Interactive API docs: http://localhost:8000/docs

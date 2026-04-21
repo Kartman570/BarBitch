@@ -591,6 +591,114 @@ Perform the following actions and check the audit log:
 | Create a user | `Пользователь создан` with resource ID |
 | Update a user | `Пользователь изменён` with resource ID |
 | Delete a user | `Пользователь удалён` with resource ID |
+| Create a discount policy | `Скидка создана` with resource ID |
+| Update a discount policy | `Скидка изменена` with resource ID |
+| Delete a discount policy | `Скидка удалена` with resource ID |
+| Add order with discount differing from active policy | `Скидка перезаписана` with order ID |
+
+---
+
+## TC-DISCOUNTS: Discount Policies
+
+### TC-DISCOUNTS-01 — Create a global discount policy
+
+**Preconditions:** Logged in with `discounts` permission. Sidebar shows **Discounts** item.
+
+1. Click **Discounts** in the sidebar.
+2. Click **+ New discount**.
+3. Enter Name = `Happy Hour`, Discount % = `15`.
+4. Leave **All items** selected.
+5. Set Valid from = now, leave Valid until blank.
+6. Click **Save**.
+
+**Expected:** Policy appears in the table with status badge "Active", percent `15%`, items "All items", no expiry shown.
+
+---
+
+### TC-DISCOUNTS-02 — Create an item-specific timed discount
+
+**Preconditions:** At least two menu items exist.
+
+1. Open **+ New discount**.
+2. Enter Name = `Beer promo`, Discount % = `20`.
+3. Select **Specific items** and check one or two items from the list.
+4. Set Valid until = 1 hour from now.
+5. Click **Save**.
+
+**Expected:** Policy appears with status "Active" and `N items` badge showing the count.
+
+---
+
+### TC-DISCOUNTS-03 — Pause and resume a policy
+
+**Preconditions:** At least one active policy exists.
+
+1. Click the Pause button (⏸) on an active policy.
+
+**Expected:** Status badge changes to "Paused". The discount is no longer applied to new orders.
+
+2. Click the Resume button (▶) on the same policy.
+
+**Expected:** Status badge returns to "Active".
+
+---
+
+### TC-DISCOUNTS-04 — Edit a policy
+
+**Preconditions:** A policy exists.
+
+1. Click the edit (pencil) icon on a policy.
+2. Change the discount percent.
+3. Click **Save**.
+
+**Expected:** Percent column updates in the table.
+
+---
+
+### TC-DISCOUNTS-05 — Delete a policy
+
+**Preconditions:** A policy exists.
+
+1. Click the trash icon on a policy.
+2. Confirm deletion.
+
+**Expected:** Policy disappears from the list.
+
+---
+
+### TC-DISCOUNTS-06 — Active discount auto-applied in Add Order modal
+
+**Preconditions:** An active global policy (e.g. 15%) exists. Open an active table.
+
+1. Click **+ Add** on an active table.
+2. Select any item from the list.
+
+**Expected:** The Discount % field is pre-filled with `15`. The subtotal reflects the discounted price.
+
+---
+
+### TC-DISCOUNTS-07 — Override warning when barman changes discount
+
+**Preconditions:** An active policy (e.g. 15%) exists. On the Add Order modal with an item selected.
+
+1. Change the Discount % field from `15` to `0` (or any other value).
+
+**Expected:** An amber warning banner appears: "Active policy «...» sets 15% discount. Your value differs — this will be logged."
+The discount input border turns amber.
+
+---
+
+### TC-DISCOUNTS-08 — Override confirmation and audit log
+
+**Preconditions:** Same as TC-DISCOUNTS-07, with discount changed away from policy value.
+
+1. Click **Add**.
+
+**Expected:** A confirmation modal opens: "Active policy «...» sets 15%. You are setting X%. This override will be recorded in the audit log."
+
+2. Click **Override and add**.
+
+**Expected:** Order is added with the custom discount. In the Audit log, a `discount_override` event appears linked to the new order ID.
 
 ---
 

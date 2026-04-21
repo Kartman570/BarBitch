@@ -82,6 +82,8 @@ function AddOrderModal({ open, onClose, tableId, t }) {
   const [selected, setSelected] = useState(null)
   const [qty, setQty] = useState('1')
   const [discount, setDiscount] = useState('0')
+  const [policyDiscount, setPolicyDiscount] = useState(null)  // ActiveDiscountRead | null
+  const [confirmOverride, setConfirmOverride] = useState(false)
   const qc = useQueryClient()
 
   const { data: items = [] } = useQuery({
@@ -109,11 +111,40 @@ function AddOrderModal({ open, onClose, tableId, t }) {
     setSelected(null)
     setQty('1')
     setDiscount('0')
+    setPolicyDiscount(null)
+    setConfirmOverride(false)
     onClose()
+  }
+
+  const selectItem = (item) => {
+    setSelected(item)
+    setPolicyDiscount(null)
+    api.get(`/discounts/for-item/${item.id}`)
+      .then((r) => {
+        setPolicyDiscount(r.data)
+        setDiscount(String(r.data.percent))
+      })
+      .catch(() => {
+        setPolicyDiscount(null)
+        setDiscount('0')
+      })
   }
 
   const discountVal = Math.min(100, Math.max(0, parseFloat(discount || 0)))
   const subtotal = selected ? selected.price * parseInt(qty || 0, 10) * (1 - discountVal / 100) : 0
+  const isOverride = policyDiscount !== null && discountVal !== policyDiscount.percent
+
+  const doAdd = () => {
+    addMutation.mutate({ itemId: selected.id, quantity: parseInt(qty, 10), discount: discountVal })
+  }
+
+  const handleAddClick = () => {
+    if (isOverride) {
+      setConfirmOverride(true)
+    } else {
+      doAdd()
+    }
+  }
 
   return (
     <Modal open={open} onClose={handleClose} title={t('td_add_title')} size="md">
@@ -137,7 +168,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
                 filtered.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => setSelected(item)}
+                    onClick={() => selectItem(item)}
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-800 text-left transition-colors"
                   >
                     <div>
@@ -164,7 +195,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
                 <p className="font-medium text-gray-200">{selected.name}</p>
                 <p className="text-sm text-amber-400">{selected.price.toFixed(2)} {t('td_per_unit', { currency: CURRENCY })}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="btn-ghost btn-sm p-1.5">
+              <button onClick={() => { setSelected(null); setPolicyDiscount(null) }} className="btn-ghost btn-sm p-1.5">
                 <X size={16} />
               </button>
             </div>
@@ -184,7 +215,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
               <div>
                 <label className="label">{t('td_discount_label')}</label>
                 <input
-                  className="input"
+                  className={`input ${isOverride ? 'border-amber-500/60' : ''}`}
                   type="number"
                   min="0"
                   max="100"
@@ -195,6 +226,11 @@ function AddOrderModal({ open, onClose, tableId, t }) {
                 />
               </div>
             </div>
+            {isOverride && (
+              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                {t('disc_override_warning', { name: policyDiscount.policy_name, percent: policyDiscount.percent })}
+              </p>
+            )}
             {qty && selected && (
               <p className="text-xs text-gray-500">
                 {t('td_subtotal_label')}: {subtotal.toFixed(2)} {CURRENCY}
@@ -209,11 +245,7 @@ function AddOrderModal({ open, onClose, tableId, t }) {
             <div className="flex gap-2 justify-end">
               <button onClick={handleClose} className="btn-secondary">{t('cancel')}</button>
               <button
-                onClick={() => addMutation.mutate({
-                  itemId: selected.id,
-                  quantity: parseInt(qty, 10),
-                  discount: discountVal,
-                })}
+                onClick={handleAddClick}
                 className="btn-primary"
                 disabled={addMutation.isPending || !qty || parseInt(qty, 10) <= 0}
               >
@@ -224,6 +256,37 @@ function AddOrderModal({ open, onClose, tableId, t }) {
           </>
         )}
       </div>
+
+      {/* Override confirmation modal */}
+      <Modal
+        open={confirmOverride}
+        onClose={() => setConfirmOverride(false)}
+        title={t('disc_override_confirm_title')}
+        size="sm"
+      >
+        {policyDiscount && (
+          <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+              {t('disc_override_confirm_body', {
+                name: policyDiscount.policy_name,
+                percent: policyDiscount.percent,
+                custom: discountVal,
+              })}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmOverride(false)} className="btn-secondary">{t('cancel')}</button>
+              <button
+                onClick={() => { setConfirmOverride(false); doAdd() }}
+                className="btn-primary"
+                disabled={addMutation.isPending}
+              >
+                {addMutation.isPending ? <Spinner className="text-gray-950" /> : null}
+                {t('disc_override_proceed')}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Modal>
   )
 }
@@ -372,9 +435,9 @@ export default function TableDetail() {
             )}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            {t('td_opened')}: {new Date(table.created_at).toLocaleString(dateLocale)}
+            {t('td_opened')}: {new Date(table.created_at).toLocaleString(dateLocale, { hour12: false })}
             {!isActive && table.closed_at && (
-              <> · {t('td_closed_at')}: {new Date(table.closed_at).toLocaleString(dateLocale)}</>
+              <> · {t('td_closed_at')}: {new Date(table.closed_at).toLocaleString(dateLocale, { hour12: false })}</>
             )}
           </p>
         </div>

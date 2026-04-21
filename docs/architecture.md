@@ -97,13 +97,23 @@ Protected routes require `Authorization: Bearer <token>` header (JWT).
                                   ?date_from=&date_to=      — date range (default: last 30 days)
                                   ?limit=10                 — number of items to return (max 100)
 
+  discounts/                    ✅ Implemented
+      GET    /                  List all discount policies (requires discounts perm)
+      POST   /                  Create discount policy (requires discounts perm)
+      PATCH  /{policy_id}       Update policy — name, percent, item_ids, dates, is_active (requires discounts perm)
+      DELETE /{policy_id}       Delete policy (requires discounts perm)
+      GET    /for-item/{item_id} Return currently-active policy for item (requires tables perm)
+                                  Returns the highest-percent matching policy, or null.
+                                  Used by the Add Order modal to pre-fill the discount field.
+
   audit/                        ✅ Implemented
       GET    /events            Query audit log
                                   ?action=, ?limit=, ?skip= — filter & pagination; requires roles perm
                                   Actions: login_success/failure, role_created/deleted,
                                            user_created/deleted, table_created/renamed/closed/deleted,
                                            item_created/updated/deleted, stock_adjusted,
-                                           order_added/updated/deleted
+                                           order_added/updated/deleted,
+                                           discount_created/updated/deleted, discount_override
 ```
 
 ---
@@ -223,23 +233,42 @@ erDiagram
         int      id           PK
         int      user_id      "null for unauthenticated actions"
         string   username
-        string   action       "login_success | table_created | order_added | ..."
+        string   action       "login_success | table_created | order_added | discount_override | ..."
         int      resource_id  "null for non-resource actions"
         string   ip           "client IP (max 45 chars for IPv6)"
         datetime created_at
     }
 
-    ROLE  ||--o{ USER          : "assigned to"
-    TABLE ||--o{ ORDER         : "contains"
-    ITEM  ||--o{ ORDER         : "referenced by"
-    USER  ||--o{ REFRESH_TOKEN : "owns"
+    DISCOUNT_POLICY {
+        int      id             PK
+        string   name           "human label"
+        float    percent        "0–100"
+        string   item_ids       "JSON int[]; [] = applies to all items"
+        datetime valid_from
+        datetime valid_until    "null = no expiry"
+        bool     is_active      "manual pause/resume toggle"
+        int      created_by_id  "FK → USER (nullable)"
+        datetime created_at
+    }
+
+    ROLE  ||--o{ USER            : "assigned to"
+    TABLE ||--o{ ORDER           : "contains"
+    ITEM  ||--o{ ORDER           : "referenced by"
+    USER  ||--o{ REFRESH_TOKEN   : "owns"
+    USER  ||--o{ DISCOUNT_POLICY : "created by"
 ```
 
 > `ORDER.price` locks the price at the moment of ordering so later price
 > changes do not affect open or past bills.
 > `ORDER.discount` is a percentage (0–100) reducing the line total.
+>
+> A `DISCOUNT_POLICY` is active when `is_active = true`, `valid_from ≤ now`,
+> and `valid_until` is null or in the future. When multiple policies match an
+> item, the one with the highest `percent` wins. Barmen can override the
+> suggested discount; any deviation is recorded as `discount_override` in the
+> audit log.
 
-**Available permissions:** `tables`, `items`, `stock`, `stats`, `users`, `roles`
+**Available permissions:** `tables`, `items`, `stock`, `stats`, `users`, `roles`, `discounts`
 
 ---
 

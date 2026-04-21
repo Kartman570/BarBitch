@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import { useT } from '../i18n'
 
-const PERM_KEYS = ['tables', 'items', 'stock', 'stats', 'users', 'roles']
+const PERM_KEYS = ['tables', 'items', 'stock', 'stats', 'users', 'roles', 'discounts']
 
 function PermsBadges({ permissions, t }) {
   if (!permissions?.length) return <span className="text-gray-600 text-sm">{t('roles_no_perms')}</span>

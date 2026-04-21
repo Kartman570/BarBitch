@@ -13,19 +13,21 @@ import {
   Menu,
   X,
   Beer,
+  Tag,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useT, useLangStore, LANGUAGES } from '../i18n'
 import api from '../api/client'
 
 const NAV_KEYS = [
-  { to: '/tables', tKey: 'nav_tables', icon: LayoutGrid,      perm: 'tables' },
-  { to: '/menu',   tKey: 'nav_menu',   icon: UtensilsCrossed, perm: 'items'  },
-  { to: '/stock',  tKey: 'nav_stock',  icon: Package,         perm: 'stock'  },
-  { to: '/stats',  tKey: 'nav_stats',  icon: BarChart2,       perm: 'stats'  },
-  { to: '/users',  tKey: 'nav_users',  icon: Users,           perm: 'users'  },
-  { to: '/roles',  tKey: 'nav_roles',  icon: ShieldCheck,     perm: 'roles'  },
-  { to: '/audit',  tKey: 'nav_audit',  icon: ClipboardList,   perm: 'roles'  },
+  { to: '/tables',    tKey: 'nav_tables',    icon: LayoutGrid,      perm: 'tables'    },
+  { to: '/menu',      tKey: 'nav_menu',      icon: UtensilsCrossed, perm: 'items'     },
+  { to: '/stock',     tKey: 'nav_stock',     icon: Package,         perm: 'stock'     },
+  { to: '/stats',     tKey: 'nav_stats',     icon: BarChart2,       perm: 'stats'     },
+  { to: '/discounts', tKey: 'nav_discounts', icon: Tag,             perm: 'discounts' },
+  { to: '/users',     tKey: 'nav_users',     icon: Users,           perm: 'users'     },
+  { to: '/roles',     tKey: 'nav_roles',     icon: ShieldCheck,     perm: 'roles'     },
+  { to: '/audit',     tKey: 'nav_audit',     icon: ClipboardList,   perm: 'roles'     },
 ]
 
 export default function Layout() {

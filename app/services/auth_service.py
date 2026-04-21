@@ -8,7 +8,7 @@ import bcrypt as _bcrypt
 from jwt.exceptions import PyJWTError as JWTError  # noqa: F401 (re-exported)
 
 # All valid permission identifiers
-ALL_PERMISSIONS = {"tables", "items", "stock", "stats", "users", "roles"}
+ALL_PERMISSIONS = {"tables", "items", "stock", "stats", "users", "roles", "discounts"}
 
 # Default roles seeded on first run
 DEFAULT_ROLES = [
@@ -25,12 +25,12 @@ DEFAULT_ROLES = [
     {
         "name": "manager",
         "description": "Manager — full operational access plus staff management",
-        "permissions": ["tables", "items", "stock", "stats", "users"],
+        "permissions": ["tables", "items", "stock", "stats", "users", "discounts"],
     },
     {
         "name": "admin",
         "description": "Administrator — unrestricted access",
-        "permissions": ["tables", "items", "stock", "stats", "users", "roles"],
+        "permissions": ["tables", "items", "stock", "stats", "users", "roles", "discounts"],
     },
 ]
 

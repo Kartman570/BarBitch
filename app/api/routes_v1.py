@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError as JWTError
 from sqlmodel import select
 
-from models.models import User, Item, Order, Table, Role, RefreshToken, AuditEvent
+from models.models import User, Item, Order, Table, Role, RefreshToken, AuditEvent, DiscountPolicy
 from schemas.schemas_order import (
     RoleCreate, RoleRead, RoleUpdate,
     UserCreate, UserRead, UserUpdate,
@@ -15,7 +15,9 @@ from schemas.schemas_order import (
     OrderCreate, OrderRead, OrderUpdate,
     TableCreate, TableRead, TableUpdate, TableReadDetailed,
     DailyStats, AuditEventRead, TopItemStat,
+    DiscountPolicyCreate, DiscountPolicyUpdate, DiscountPolicyRead, ActiveDiscountRead,
 )
+import json as _json
 from core.database import SessionDep
 from core.config import settings
 from core.limiter import limiter
@@ -504,6 +506,10 @@ def add_order(table_id: int, data: OrderCreate, session: SessionDep, actor: Anno
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     _audit(session, "order_added", user=actor, resource_id=order.id)
+    # Log override if sent discount deviates from active policy
+    active_policy = _get_active_discount_for_item(data.item_id, session)
+    if active_policy is not None and data.discount != active_policy.percent:
+        _audit(session, "discount_override", user=actor, resource_id=order.id)
     session.commit()
     return order
 
@@ -602,6 +608,119 @@ def top_items(
     to_date = _parse_date(date_to) if date_to else date_type.today()
     from_date = _parse_date(date_from) if date_from else to_date - timedelta(days=30)
     return TableService(session).top_items(from_date, to_date, limit)
+
+
+# ── Discounts ──────────────────────────────────────────────────────────────────
+
+def _policy_currently_active(policy: DiscountPolicy) -> bool:
+    if not policy.is_active:
+        return False
+    now = datetime.now()
+    if policy.valid_from > now:
+        return False
+    if policy.valid_until is not None and policy.valid_until < now:
+        return False
+    return True
+
+
+def _policy_to_read(p: DiscountPolicy) -> DiscountPolicyRead:
+    return DiscountPolicyRead(
+        id=p.id,
+        name=p.name,
+        percent=p.percent,
+        item_ids=_json.loads(p.item_ids),
+        valid_from=p.valid_from,
+        valid_until=p.valid_until,
+        is_active=p.is_active,
+        created_by_id=p.created_by_id,
+        created_at=p.created_at,
+        is_currently_active=_policy_currently_active(p),
+    )
+
+
+def _get_active_discount_for_item(item_id: int, session) -> DiscountPolicy | None:
+    """Return the highest-percent currently-active policy that covers item_id."""
+    now = datetime.now()
+    policies = session.exec(
+        select(DiscountPolicy)
+        .where(DiscountPolicy.is_active == True)
+        .where(DiscountPolicy.valid_from <= now)
+        .where(
+            (DiscountPolicy.valid_until == None) | (DiscountPolicy.valid_until >= now)
+        )
+    ).all()
+    candidates = [
+        p for p in policies
+        if not _json.loads(p.item_ids) or item_id in _json.loads(p.item_ids)
+    ]
+    return max(candidates, key=lambda p: p.percent) if candidates else None
+
+
+@router.get("/discounts/for-item/{item_id}", response_model=ActiveDiscountRead | None, tags=["discounts"])
+def get_active_discount(item_id: int, session: SessionDep, _: Annotated[User, _perm("tables")]):
+    policy = _get_active_discount_for_item(item_id, session)
+    if policy is None:
+        return None
+    return ActiveDiscountRead(policy_id=policy.id, policy_name=policy.name, percent=policy.percent)
+
+
+@router.get("/discounts/", response_model=list[DiscountPolicyRead], tags=["discounts"])
+def list_discounts(session: SessionDep, _: Annotated[User, _perm("discounts")]):
+    policies = session.exec(select(DiscountPolicy).order_by(DiscountPolicy.created_at.desc())).all()
+    return [_policy_to_read(p) for p in policies]
+
+
+@router.post("/discounts/", response_model=DiscountPolicyRead, tags=["discounts"])
+def create_discount(data: DiscountPolicyCreate, session: SessionDep, actor: Annotated[User, _perm("discounts")]):
+    policy = DiscountPolicy(
+        name=data.name,
+        percent=data.percent,
+        item_ids=_json.dumps(data.item_ids),
+        valid_from=data.valid_from or datetime.now(),
+        valid_until=data.valid_until,
+        created_by_id=actor.id,
+    )
+    session.add(policy)
+    session.flush()
+    _audit(session, "discount_created", user=actor, resource_id=policy.id)
+    session.commit()
+    session.refresh(policy)
+    return _policy_to_read(policy)
+
+
+@router.patch("/discounts/{policy_id}", response_model=DiscountPolicyRead, tags=["discounts"])
+def update_discount(policy_id: int, data: DiscountPolicyUpdate, session: SessionDep, actor: Annotated[User, _perm("discounts")]):
+    policy = session.get(DiscountPolicy, policy_id)
+    if policy is None:
+        raise HTTPException(status_code=404, detail="Discount policy not found")
+    if data.name is not None:
+        policy.name = data.name
+    if data.percent is not None:
+        policy.percent = data.percent
+    if data.item_ids is not None:
+        policy.item_ids = _json.dumps(data.item_ids)
+    if data.valid_from is not None:
+        policy.valid_from = data.valid_from
+    if "valid_until" in data.model_fields_set:
+        policy.valid_until = data.valid_until
+    if data.is_active is not None:
+        policy.is_active = data.is_active
+    session.add(policy)
+    _audit(session, "discount_updated", user=actor, resource_id=policy_id)
+    session.commit()
+    session.refresh(policy)
+    return _policy_to_read(policy)
+
+
+@router.delete("/discounts/{policy_id}", tags=["discounts"])
+def delete_discount(policy_id: int, session: SessionDep, actor: Annotated[User, _perm("discounts")]):
+    policy = session.get(DiscountPolicy, policy_id)
+    if policy is None:
+        raise HTTPException(status_code=404, detail="Discount policy not found")
+    _audit(session, "discount_deleted", user=actor, resource_id=policy_id)
+    session.delete(policy)
+    session.commit()
+    return {"message": "Discount policy deleted"}
 
 
 # ── Audit log ──────────────────────────────────────────────────────────────────

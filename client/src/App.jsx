@@ -10,6 +10,7 @@ import Users from './pages/Users'
 import Roles from './pages/Roles'
 import Stats from './pages/Stats'
 import Audit from './pages/Audit'
+import Discounts from './pages/Discounts'
 
 function RequireAuth({ children }) {
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -79,6 +80,14 @@ export default function App() {
             element={
               <RequirePerm permission="stats">
                 <Stats />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="discounts"
+            element={
+              <RequirePerm permission="discounts">
+                <Discounts />
               </RequirePerm>
             }
           />

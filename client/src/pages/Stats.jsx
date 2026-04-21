@@ -180,7 +180,7 @@ export default function Stats() {
                       {stats.orders_log.map((entry) => (
                         <tr key={entry.order_id}>
                           <td className="text-gray-500 text-xs">
-                            {new Date(entry.created_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(entry.created_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </td>
                           <td>{entry.table_name}</td>
                           <td>{entry.item_name}</td>

@@ -205,3 +205,39 @@ class TopItemStat(BaseModel):
     quantity: int
     revenue: float
     orders_count: int
+
+
+# ==== DISCOUNT SCHEMAS ====
+
+class DiscountPolicyCreate(BaseModel):
+    name: str
+    percent: float = Field(ge=0, le=100)
+    item_ids: List[int] = []        # empty list = applies to all items
+    valid_from: Optional[datetime] = None   # defaults to now on backend
+    valid_until: Optional[datetime] = None  # None = no expiry
+
+class DiscountPolicyUpdate(BaseModel):
+    name: Optional[str] = None
+    percent: Optional[float] = Field(default=None, ge=0, le=100)
+    item_ids: Optional[List[int]] = None
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+    is_active: Optional[bool] = None
+
+class DiscountPolicyRead(BaseModel):
+    id: int
+    name: str
+    percent: float
+    item_ids: List[int]
+    valid_from: datetime
+    valid_until: Optional[datetime]
+    is_active: bool
+    created_by_id: Optional[int]
+    created_at: datetime
+    is_currently_active: bool       # computed: is_active and within time window
+    model_config = ConfigDict(from_attributes=True)
+
+class ActiveDiscountRead(BaseModel):
+    policy_id: int
+    policy_name: str
+    percent: float

@@ -77,6 +77,19 @@ class Table(SQLModel, table=True):
     )
 
 
+class DiscountPolicy(SQLModel, table=True):
+    __tablename__ = "discount_policies"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100)
+    percent: float = Field(ge=0, le=100)
+    item_ids: str = Field(default="[]")  # JSON int[]; [] = applies to all items
+    valid_from: datetime = Field(default_factory=datetime.now)
+    valid_until: datetime | None = Field(default=None)   # None = unlimited
+    is_active: bool = Field(default=True)
+    created_by_id: int | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 class Order(SQLModel, table=True):
     __tablename__ = "orders"
     id: int | None = Field(default=None, primary_key=True)
