@@ -759,6 +759,365 @@ The discount input border turns amber.
 
 ---
 
+## TC-I18N: Language Switching
+
+### TC-I18N-01 — Switch language from English to Russian
+
+**Preconditions:** Logged in. UI language is English (default).
+
+1. Open the language selector (top of the sidebar or header).
+2. Select **Русский**.
+
+**Expected:** All sidebar labels, button text, form labels, and status badges switch to Russian immediately. Selected language is persisted — after page reload the UI remains in Russian (`bar-pos-lang` key in localStorage = `"ru"`).
+
+---
+
+### TC-I18N-02 — Switch language to Georgian
+
+**Preconditions:** Logged in.
+
+1. Select **ქართული** from the language selector.
+
+**Expected:** UI switches to Georgian. Date formatting in Stats page changes to `ka-GE` locale (day/month ordering per Georgian convention).
+
+---
+
+### TC-I18N-03 — Language selection persists across sessions
+
+**Preconditions:** Language set to Russian.
+
+1. Log out and log back in.
+
+**Expected:** UI is still in Russian. The `bar-pos-lang` localStorage key survives logout/login.
+
+---
+
+### TC-I18N-04 — Language selector is available on the login page
+
+**Preconditions:** Logged out, on `/login`.
+
+**Expected:** Language selector is visible and functional before authentication. Switching language changes the login form labels and button text immediately.
+
+---
+
+## TC-RECEIPT: Receipt PDF Details
+
+### TC-RECEIPT-01 — Receipt content verification
+
+**Preconditions:** Closed table with at least two order lines with Cyrillic item names and mixed prices.
+
+1. Click **Скачать чек** on the closed table's detail page.
+2. Open the downloaded PDF.
+
+**Expected:** PDF contains:
+- Table name (top)
+- Date and time the table was opened and closed
+- Each order line: item name, quantity, unit price, line total
+- Grand total at the bottom
+- All Cyrillic characters render correctly (no squares or fallback glyphs)
+
+---
+
+### TC-RECEIPT-02 — Receipt with QR code
+
+**Preconditions:** `RECEIPT_QR` and `RECEIPT_QR_TITLE` env vars are set (e.g. `RECEIPT_QR=https://example.com`, `RECEIPT_QR_TITLE=Наш сайт`). Container restarted after change.
+
+1. Close a table with at least one order.
+2. Download the PDF receipt.
+3. Open the PDF.
+
+**Expected:** A scannable QR code appears on the receipt. The caption text (value of `RECEIPT_QR_TITLE`) is printed below the QR code.
+
+---
+
+### TC-RECEIPT-03 — Receipt unavailable for active table
+
+**Preconditions:** An active (not closed) table.
+
+**Expected:** The **Скачать чек** button is not shown on the Table Detail page while the table is Active.
+
+---
+
+## TC-ORDERS: Order Edge Cases
+
+### TC-ORDERS-01 — Price snapshot is immutable
+
+**Preconditions:** Active table has an order for Item A at price 100 ₽.
+
+1. Go to Menu and change Item A's price to 200 ₽.
+2. Return to the Table Detail.
+
+**Expected:** The existing order line still shows 100 ₽ (the price at order creation time). The running total is based on the original price, not the updated one.
+
+---
+
+### TC-ORDERS-02 — Cannot add order to a closed table (API)
+
+**Preconditions:** A closed table exists. Use API docs at http://localhost:8000/docs.
+
+1. Obtain a valid JWT (via `POST /api/v1/auth/login`).
+2. Call `POST /api/v1/tables/{closed_id}/orders/` with a valid item payload.
+
+**Expected:** `400 Bad Request` — response body indicates orders cannot be added to a closed table.
+
+---
+
+### TC-ORDERS-03 — Stock automatically adjusts when order quantity is edited
+
+**Preconditions:** Item with `stock_qty = 10`. Order exists on an active table with quantity = 2 (so current stock is 8).
+
+1. Click the edit icon on that order row.
+2. Change quantity from 2 to 5.
+3. Save.
+
+**Expected:** Order quantity becomes 5. Item stock decreases by 3 (from 8 → 5). Verify in the Stock page.
+
+4. Edit the order again, change quantity from 5 to 1.
+
+**Expected:** Item stock increases by 4 (from 5 → 9).
+
+---
+
+### TC-ORDERS-04 — Cannot set order quantity below 1
+
+**Preconditions:** Active table has an order. Use API docs.
+
+1. Call `PATCH /api/v1/tables/{id}/orders/{order_id}` with `quantity: 0`.
+
+**Expected:** `422 Unprocessable Entity` or `400 Bad Request` — quantity must be a positive integer.
+
+---
+
+## TC-STOCK-EXTENDED: Stock — Additional Cases
+
+### TC-STOCK-05 — Untracked item stock cannot be adjusted
+
+**Preconditions:** A menu item exists with stock tracking disabled (`stock_qty` is null — i.e., the item was created without enabling stock tracking). Use API docs.
+
+1. Call `PATCH /api/v1/items/{id}/stock` with `delta: 5`.
+
+**Expected:** `400 Bad Request` — stock adjustment is not allowed for items without stock tracking enabled.
+
+---
+
+### TC-STOCK-06 — Low stock threshold is ≤ 3 (not ≤ 5)
+
+**Preconditions:** An item with stock tracking enabled.
+
+1. Set item stock to 4 (via + adjustment in the Stock page).
+
+**Expected:** Stock cell is displayed normally — no red/amber highlight.
+
+2. Decrease stock to 3.
+
+**Expected:** Stock cell turns red/amber (low-stock warning). The sidebar badge showing low-stock item count increments by 1.
+
+---
+
+## TC-DISCOUNTS-EXTENDED: Discount Policy — Additional Cases
+
+### TC-DISCOUNTS-09 — Pending discount (valid_from in future)
+
+**Preconditions:** On the Discounts page.
+
+1. Create a new discount policy with Discount % = `10`, Valid from = 2 hours from now, Valid until = blank.
+
+**Expected:** Policy appears in the table with status badge **"Pending"** (not "Active"). The discount is not pre-filled in the Add Order modal.
+
+---
+
+### TC-DISCOUNTS-10 — Expired discount
+
+**Preconditions:** An active discount policy exists.
+
+1. Edit the policy and set Valid until = 1 minute in the past (or a past datetime).
+
+**Expected:** Policy status badge changes to **"Expired"**. It is no longer pre-filled in the Add Order modal.
+
+---
+
+### TC-DISCOUNTS-11 — Multiple overlapping policies — highest wins
+
+**Preconditions:** Two active global discount policies exist: one at 10%, one at 20%.
+
+1. Open an active table and click **+ Add**.
+2. Select any item.
+
+**Expected:** The Discount % field is pre-filled with `20` (the higher of the two applicable policies).
+
+---
+
+### TC-DISCOUNTS-12 — Item-specific policy takes effect for that item only
+
+**Preconditions:** Two active policies: global 10%, item-specific 25% for Item A only.
+
+1. Open Add Order modal, select Item A.
+
+**Expected:** Discount pre-filled with `25`.
+
+2. In the same modal, select Item B (not in the item-specific policy).
+
+**Expected:** Discount pre-filled with `10` (global policy).
+
+---
+
+### TC-DISCOUNTS-13 — No override audit event when no active policy
+
+**Preconditions:** No active discount policies exist. On the Add Order modal.
+
+1. Manually enter any value in the Discount % field (e.g. `5`).
+2. Click **Add**.
+
+**Expected:** Order is added. No override warning banner is shown. No `discount_override` event appears in the Audit Log.
+
+---
+
+## TC-MENU-EXTENDED: Menu — Additional Cases
+
+### TC-MENU-08 — Deleted item name preserved in existing orders
+
+**Preconditions:** A closed table has at least one order for Item X. Item X exists in the menu.
+
+1. Go to Menu and delete Item X (confirm deletion).
+2. Go to Stats → Orders log and find the historical order.
+
+**Expected:** The order line still shows Item X's original name (price snapshot preserved). The Stats page does not error out on missing item.
+
+---
+
+### TC-MENU-09 — Unavailable item excluded from order search
+
+**Preconditions:** Item Y is marked unavailable (not checked as **Доступен**).
+
+1. Open an active table → **+ Добавить товар**.
+2. Search for Item Y by name.
+
+**Expected:** Item Y does not appear in the search results. The item is hidden from order creation even if its exact name is typed.
+
+---
+
+## TC-USERS-EXTENDED: User Management — Additional Cases
+
+### TC-USERS-08 — Duplicate username rejected
+
+**Preconditions:** A user with login `bartender1` already exists.
+
+1. Click **Добавить** to open the Create User modal.
+2. Enter Login = `bartender1` (same as existing) and fill other required fields.
+3. Click **Сохранить**.
+
+**Expected:** API returns an error. An error message is displayed in the form. No duplicate user is created.
+
+---
+
+### TC-USERS-09 — Password complexity on user update
+
+**Preconditions:** A user exists.
+
+1. Open the edit modal for that user.
+2. Enter a new password `abcdefgh` (8 chars, no digit or special character).
+3. Click **Сохранить**.
+
+**Expected:** API returns validation error. Error message describes the password policy (≥8 chars + digit or special character). User's password is not changed.
+
+---
+
+## TC-STATS-EXTENDED: Statistics — Additional Cases
+
+### TC-STATS-05 — Top items chart
+
+**Preconditions:** At least 3 different items have orders today (or on the selected date).
+
+1. Go to **Статистика**.
+
+**Expected:** A bar chart (top items) is displayed showing item names and quantities/revenue. Items are ordered from most to least sold. The list shows at most 10 items by default.
+
+---
+
+### TC-STATS-06 — Revenue split accuracy
+
+**Preconditions:** Fresh DB seed. Create Table A (add 2× Item at 100 ₽ each = 200 ₽ total), keep it active. Create Table B (add 1× Item at 150 ₽), close it.
+
+1. Go to **Статистика** → today.
+
+**Expected:**
+- "Выручка за день" = 350 ₽ (all orders)
+- "Активные столы" revenue = 200 ₽
+- "Закрытые столы" revenue = 150 ₽
+
+---
+
+## TC-CURRENCY: Currency Display
+
+### TC-CURRENCY-01 — Currency symbol reflects VITE_CURRENCY setting
+
+**Preconditions:** `VITE_CURRENCY=GEL` is set in `.env`. Client container restarted (`docker compose restart client`).
+
+1. Log in and navigate to Tables, Menu, Stats, and Table Detail.
+
+**Expected:** All price displays use the ₾ symbol instead of ₽. Downloaded PDF receipt also shows ₾.
+
+---
+
+### TC-CURRENCY-02 — Default currency is ₽ (RUB)
+
+**Preconditions:** `VITE_CURRENCY` is not set (or set to `RUB`).
+
+**Expected:** All prices are displayed with the ₽ symbol throughout the UI and in PDF receipts.
+
+---
+
+## TC-SEC-EXTENDED: Security — Additional Cases
+
+### TC-SEC-06 — Login rate limiting
+
+**Preconditions:** Logged out.
+
+1. Submit 10 failed login attempts in rapid succession (wrong password, same IP).
+2. Submit the 11th attempt.
+
+**Expected:** The 11th request receives `429 Too Many Requests`. After waiting ~1 minute, a new attempt proceeds normally.
+
+---
+
+### TC-SEC-07 — Security headers in responses
+
+**Preconditions:** App is running.
+
+1. Run:
+   ```bash
+   curl -I http://localhost:8000/api/v1/auth/login
+   ```
+
+**Expected:** Response headers include:
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+---
+
+### TC-SEC-08 — API docs hidden in production mode
+
+**Preconditions:** Set `DEBUG=false` in `.env`. Restart the app container.
+
+1. Navigate to http://localhost:8000/docs.
+2. Navigate to http://localhost:8000/openapi.json.
+
+**Expected:** Both return 404 (docs endpoint is disabled). Reset `DEBUG=true` to restore.
+
+---
+
+### TC-SEC-09 — Barman can see discount for item but cannot manage discount policies
+
+**Preconditions:** A user exists with only the `tables` permission (e.g. `barman` role). An active discount policy exists.
+
+1. Log in as that user.
+
+**Expected:** Sidebar does **not** show the **Discounts** navigation item. The Add Order modal still pre-fills the active discount percent correctly.
+
+---
+
 ## Known Limitations
 
 | Limitation | Notes |
