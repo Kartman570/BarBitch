@@ -12,7 +12,7 @@ x-env-app: &env-app
   RECEIPT_QR_TITLE: ${RECEIPT_QR_TITLE:-}
 
 x-env-client: &env-client
-  VITE_CURRENCY: ${VITE_CURRENCY:-RUB}
+  VITE_CURRENCY: ${VITE_CURRENCY:-USD}
 
 # ── Services ───────────────────────────────────────────────────────────────────
 services:

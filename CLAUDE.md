@@ -53,7 +53,7 @@ docker compose down        # stop
 | `DEBUG` | — | `true` | Set `false` in production to hide `/docs` and `/openapi.json` |
 | `RECEIPT_QR` | — | `""` | Message encoded as QR code on receipts (omit to skip QR) |
 | `RECEIPT_QR_TITLE` | — | `""` | Additional text message below QR code on receipts (omit to skip) |
-| `VITE_CURRENCY` | — | `RUB` | Currency symbol shown in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾). Frontend-only. |
+| `VITE_CURRENCY` | — | `USD` | Currency symbol shown in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾). Frontend-only. |
 
 ### Database migrations
 ```bash

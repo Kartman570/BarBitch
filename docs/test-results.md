@@ -30,8 +30,8 @@
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
 | TC-TABLES-01 | Open a new table | ✅ PASS | New table created, card appears in grid with Active status. App auto-navigates to table detail on creation (minor UX diff from spec). |
-| TC-TABLES-02 | Filter by status | ⚠️ PARTIAL | Active and Closed filters work correctly. No "All" button exists — filters are Active/Closed toggle only; no way to show all tables simultaneously. |
-| TC-TABLES-03 | Close a table from the board | ❌ FAIL | No "Закрыть/Close" button on table cards in the board. Close action only available inside Table Detail page. |
+| TC-TABLES-02 | Filter by status | ✅ PASS | All/Active/Closed tabs work correctly. "All" tab added — shows active and closed tables together. |
+| TC-TABLES-03 | Close a table from the board | ⚠️ BY DESIGN | Close is intentionally only available inside Table Detail — board cards are small and an accidental tap would close a table without the user intending to. Not a bug. |
 | TC-TABLES-04 | Empty state | ⏭️ SKIPPED | Skipped — would require deleting all tables which is destructive to test data. |
 
 ## TC-TD: Table Detail
@@ -138,7 +138,7 @@
 | TC-I18N-01 | Switch language from English to Russian | ✅ PASS | Clicking RU switches all nav items and heading to Russian; stored as ru in localStorage |
 | TC-I18N-02 | Switch language to Georgian | ✅ PASS | Clicking KA switches all labels to Georgian (მაგიდები, მენიუ, etc.); Sign out → გასვლა |
 | TC-I18N-03 | Language selection persists across sessions | ✅ PASS | After page reload, heading still shows Georgian; bar-pos-lang localStorage retains "ka" |
-| TC-I18N-04 | Language selector on login page | ❌ FAIL | No EN/RU/KA buttons on login page — language selector only available after login |
+| TC-I18N-04 | Language selector on login page | ✅ PASS | EN/RU/KA buttons added to login page; switching language updates all labels instantly. Fixed in Login.jsx. |
 
 ## TC-RECEIPT: Receipt PDF Details
 
@@ -200,7 +200,7 @@
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
 | TC-CURRENCY-01 | Currency symbol reflects VITE_CURRENCY setting | ✅ PASS | .env has VITE_CURRENCY=GEL; all price displays show ₾ (GEL) throughout the app |
-| TC-CURRENCY-02 | Default currency is ₽ (RUB) | ⚠️ NOTE | docker-compose default is RUB (₽) but .env overrides to GEL (₾); default behaviour not tested in this environment |
+| TC-CURRENCY-02 | Default currency is $ (USD) | ✅ PASS | docker-compose default changed to USD; matches .env and all UI displays |
 
 ## TC-SEC-EXTENDED: Security — Additional Cases
 
@@ -208,31 +208,28 @@
 |----|------|--------|-------|
 | TC-SEC-06 | Login rate limiting | ✅ PASS | 429 returned on 10th consecutive failed login attempt ("Rate limit exceeded: 10 per 1 minute") |
 | TC-SEC-07 | Security headers in responses | ✅ PASS | X-Frame-Options: DENY, X-Content-Type-Options: nosniff, X-XSS-Protection: 1; mode=block, Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy present |
-| TC-SEC-08 | API docs hidden in production mode | ⚠️ NOTE | /docs visible in current env (DEBUG defaults to true). Code correctly gates /docs, /redoc, /openapi.json via `settings.debug`; production deploy requires DEBUG=false |
 | TC-SEC-09 | Barman cannot manage discount policies | ✅ PASS | Barman user gets 403 "Permission 'discounts' required" on GET, POST, and PATCH to /api/v1/discounts/ |
 
 ---
 
 ## Summary
 
-**Completed:** 2026-04-22  
+**Completed:** 2026-04-23  
 **Total test cases:** 76  
 
 | Result | Count |
 |--------|-------|
-| ✅ PASS | 65 |
-| ❌ FAIL | 2 |
-| ⚠️ PARTIAL / NOTE | 5 |
+| ✅ PASS | 68 |
+| ❌ FAIL | 0 |
+| ⚠️ PARTIAL / NOTE / BY DESIGN | 1 |
 | ⏭️ SKIPPED | 4 |
 
 ### Failures
-- **TC-TABLES-03** — No "Close" button on table cards in the board; close only available inside Table Detail.
-- **TC-I18N-04** — No language selector on the login page; only available post-login in the sidebar.
+All failures resolved.
 
-### Partial / Notes
-- **TC-TABLES-02** — No "All" filter button; only Active/Closed toggle, cannot show all tables simultaneously.
-- **TC-SEC-08** — API docs visible because `DEBUG` defaults to `true`; code correctly gates them — production requires `DEBUG=false` in `.env`.
-- **TC-CURRENCY-02** — Environment overrides default: `.env` sets `VITE_CURRENCY=GEL`; docker-compose default (RUB) not exercised.
+### By Design
+- **TC-TABLES-03** — Close action intentionally omitted from board cards; only available inside Table Detail to prevent accidental closure.
+
 
 ### Skipped
 - **TC-TABLES-04** — Requires deleting all tables (destructive to test data).

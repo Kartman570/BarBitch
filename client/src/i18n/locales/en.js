@@ -37,10 +37,12 @@ export default {
   // === TABLES ===
   tables_title: 'Tables',
   tables_new: 'New table',
+  tables_tab_all: 'All',
   tables_tab_active: 'Active',
   tables_tab_closed: 'Closed',
   tables_empty_active: 'No active tables. Open one!',
   tables_empty_closed: 'No closed tables today.',
+  tables_empty_all: 'No tables yet.',
   tables_name_label: 'Table name',
   tables_name_placeholder: 'Table 1, Terrace, VIP…',
   tables_create: 'Create',

@@ -37,10 +37,12 @@ export default {
   // === TABLES ===
   tables_title: 'Столы',
   tables_new: 'Новый стол',
+  tables_tab_all: 'Все',
   tables_tab_active: 'Активные',
   tables_tab_closed: 'Закрытые',
   tables_empty_active: 'Нет активных столов. Создайте новый!',
   tables_empty_closed: 'Нет закрытых столов за сегодня.',
+  tables_empty_all: 'Нет столов.',
   tables_name_label: 'Название стола',
   tables_name_placeholder: 'Стол 1, Терраса, VIP...',
   tables_create: 'Создать',

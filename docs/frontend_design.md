@@ -26,6 +26,20 @@ Fixed sidebar (collapsible on tablet).
 
 Top bar shows: app name, current page title, logged-in user name (Phase 3 — hidden until auth).
 
+Sidebar bottom section: logged-in user name/username, language switcher (EN / RU / KA), logout button.
+
+---
+
+## Screen 0 — Login `/login`
+
+| Element | Details |
+|---------|---------|
+| Language switcher | EN / RU / KA buttons, top-right of the card area. Persisted to `bar-pos-lang` localStorage. |
+| Username input | Required |
+| Password input | Required, with show/hide toggle |
+| **[Sign in]** button | Calls `POST /api/v1/auth/login`. On success redirects to `/tables`. |
+| Error display | Shows API error message inline below password field. |
+
 ---
 
 ## Screen 1 — Tables Board `/tables`
@@ -35,7 +49,7 @@ Top bar shows: app name, current page title, logged-in user name (Phase 3 — hi
 ### Layout
 
 - Top row: page title "Tables", **[+ Open Table]** button (right-aligned)
-- Filter bar below: three tab buttons — **All** | **Active** | **Closed** (default: All)
+- Filter bar below: three tab buttons — **All** | **Active** | **Closed** (default: Active)
 - Responsive card grid below
 
 ### Table Card
@@ -49,7 +63,8 @@ Each open/closed table is one card.
 | Order count | "N orders" |
 | Running total | Currency amount (e.g. `$42.50`) — sum of all orders; `$0.00` if no orders yet |
 | **[View]** button | Opens Table Detail screen |
-| **[Close]** button | Visible only if status = Active. Opens Close Confirmation dialog |
+
+> **Design decision:** No close button on board cards. Closing a table is intentionally available only from Table Detail to prevent accidental closure on small cards.
 
 Empty state (no tables): message "No tables yet — open one to get started."
 
@@ -63,17 +78,6 @@ Triggered by **[+ Open Table]**.
 | Text input | Label: "Table name", placeholder: "e.g. Table 3, Bar Tab, Terrace" — required, max 100 chars |
 | **[Open]** button | Disabled until name is non-empty. Calls `POST /api/v1/tables/`. Closes dialog on success, new card appears in grid |
 | **[Cancel]** button | Closes dialog without action |
-
-### Close Confirmation Dialog
-
-Triggered by **[Close]** on a card.
-
-| Element | Details |
-|---------|---------|
-| Title | "Close table?" |
-| Body | "Table: {name}" / "Total: {amount}" / "This will lock the bill and mark the table as closed." |
-| **[Confirm Close]** button | Calls `POST /api/v1/tables/{id}/close`. Updates card status on success |
-| **[Cancel]** button | Dismisses dialog |
 
 ---
 

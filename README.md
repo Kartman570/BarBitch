@@ -86,7 +86,7 @@ All settings live in `.env` (copy from `.env.example`).
 | `DEBUG` | — | `true` | Set `false` in production to hide `/docs` |
 | `RECEIPT_QR` | — | `""` | URL encoded as QR code on printed receipts |
 | `RECEIPT_QR_TITLE` | — | `""` | Caption text below the QR code |
-| `VITE_CURRENCY` | — | `RUB` | Currency symbol in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾) |
+| `VITE_CURRENCY` | — | `USD` | Currency symbol in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾) |
 
 > **Changing currency:** set `VITE_CURRENCY=GEL` (or `USD`/`EUR`) in `.env`, then restart the client container:
 > ```bash

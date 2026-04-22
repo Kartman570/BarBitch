@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Beer, Eye, EyeOff } from 'lucide-react'
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
-import { useT } from '../i18n'
+import { useT, useLangStore, LANGUAGES } from '../i18n'
 import Spinner from '../components/Spinner'
 
 export default function Login() {
@@ -14,6 +14,7 @@ export default function Login() {
   const setAuth = useAuthStore((s) => s.setAuth)
   const navigate = useNavigate()
   const t = useT()
+  const { lang, setLang } = useLangStore()
 
   const loginMutation = useMutation({
     mutationFn: (creds) => axios.post('/api/v1/auth/login', creds),
@@ -44,6 +45,21 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
       <div className="w-full max-w-sm">
+        <div className="flex justify-end gap-1 mb-4">
+          {LANGUAGES.map(({ code, label }) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              className={`text-xs px-2 py-1 rounded font-medium transition-colors ${
+                lang === code
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-amber-500/15 rounded-2xl flex items-center justify-center mb-4">
             <Beer size={32} className="text-amber-500" />

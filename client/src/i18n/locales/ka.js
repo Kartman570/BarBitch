@@ -37,10 +37,12 @@ export default {
   // === TABLES ===
   tables_title: 'მაგიდები',
   tables_new: 'ახალი მაგიდა',
+  tables_tab_all: 'ყველა',
   tables_tab_active: 'აქტიური',
   tables_tab_closed: 'დახურული',
   tables_empty_active: 'აქტიური მაგიდა არ არის. გახსენით ახალი!',
   tables_empty_closed: 'დღეს დახურული მაგიდა არ არის.',
+  tables_empty_all: 'მაგიდები არ არის.',
   tables_name_label: 'მაგიდის სახელი',
   tables_name_placeholder: 'მაგიდა 1, აივანი, VIP...',
   tables_create: 'შექმნა',

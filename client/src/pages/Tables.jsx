@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, RefreshCw, Clock, CheckCircle } from 'lucide-react'
+import { Plus, RefreshCw, Clock, CheckCircle, LayoutGrid } from 'lucide-react'
 import api from '../api/client'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
@@ -51,12 +51,12 @@ export default function Tables() {
   const t = useT()
   const dateLocale = useDateLocale()
 
-  const statusParam = tab === 'active' ? 'Active' : 'Closed'
+  const statusParam = tab === 'active' ? 'Active' : tab === 'closed' ? 'Closed' : undefined
 
   const { data: tables = [], isLoading, refetch } = useQuery({
     queryKey: ['tables', tab],
-    queryFn: () => api.get('/tables/', { params: { status: statusParam } }).then((r) => r.data),
-    refetchInterval: tab === 'active' ? 30_000 : false,
+    queryFn: () => api.get('/tables/', { params: statusParam ? { status: statusParam } : {} }).then((r) => r.data),
+    refetchInterval: tab !== 'closed' ? 30_000 : false,
   })
 
   const createMutation = useMutation({
@@ -69,12 +69,13 @@ export default function Tables() {
     },
   })
 
-  const handleCreate = (e) => {
+const handleCreate = (e) => {
     e.preventDefault()
     if (tableName.trim()) createMutation.mutate(tableName.trim())
   }
 
   const TABS = [
+    { key: 'all', tKey: 'tables_tab_all', icon: LayoutGrid },
     { key: 'active', tKey: 'tables_tab_active', icon: Clock },
     { key: 'closed', tKey: 'tables_tab_closed', icon: CheckCircle },
   ]
@@ -116,7 +117,7 @@ export default function Tables() {
       ) : tables.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-500">
           <Clock size={40} className="mb-3 opacity-30" />
-          <p>{tab === 'active' ? t('tables_empty_active') : t('tables_empty_closed')}</p>
+          <p>{tab === 'active' ? t('tables_empty_active') : tab === 'closed' ? t('tables_empty_closed') : t('tables_empty_all')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
