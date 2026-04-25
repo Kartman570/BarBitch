@@ -26,7 +26,7 @@ Fixed sidebar (collapsible on tablet).
 
 Top bar shows: app name, current page title, logged-in user name (Phase 3 — hidden until auth).
 
-Sidebar bottom section: logged-in user name/username, language switcher (EN / RU / KA), logout button.
+Sidebar bottom section: logged-in user name/username, language switcher, logout button.
 
 ---
 
@@ -34,7 +34,7 @@ Sidebar bottom section: logged-in user name/username, language switcher (EN / RU
 
 | Element | Details |
 |---------|---------|
-| Language switcher | EN / RU / KA buttons, top-right of the card area. Persisted to `bar-pos-lang` localStorage. |
+| Language switcher | Language selector, top-right of the card area. Persisted to `bar-pos-lang` localStorage. |
 | Username input | Required |
 | Password input | Required, with show/hide toggle |
 | **[Sign in]** button | Calls `POST /api/v1/auth/login`. On success redirects to `/tables`. |

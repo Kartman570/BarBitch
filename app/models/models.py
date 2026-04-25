@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
+from sqlalchemy import Column, Integer, ForeignKey
 from sqlmodel import Field, SQLModel, Relationship
 
 
@@ -94,11 +95,15 @@ class Order(SQLModel, table=True):
     __tablename__ = "orders"
     id: int | None = Field(default=None, primary_key=True)
     table_id: int = Field(foreign_key="tables.id", index=True)
-    item_id: int = Field(foreign_key="items.id", index=True)
+    item_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True, index=True),
+    )
+    item_name: str = Field(default="")  # snapshot of item.name at order time
     quantity: int = Field(default=1)
     price: float  # snapshot of item.price at order time
     discount: float = Field(default=0.0)  # percentage 0–100 applied to this line
     created_at: datetime = Field(default_factory=datetime.now)
 
     table: Table = Relationship(back_populates="orders")
-    item: Item = Relationship(back_populates="orders")
+    item: Optional["Item"] = Relationship(back_populates="orders")

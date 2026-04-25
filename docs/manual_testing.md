@@ -42,7 +42,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Open http://localhost:8501 (or any protected URL).
 2. Enter login `admin`, password `admin`.
-3. Click **Войти**.
+3. Click **Sign in**.
 
 **Expected:** Redirected to `/tables`. Sidebar shows all nav items. Top-left shows user name and role.
 
@@ -53,9 +53,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 **Preconditions:** On the login page.
 
 1. Enter login `admin`, password `wrongpass`.
-2. Click **Войти**.
+2. Click **Sign in**.
 
-**Expected:** Error message shown under the form. URL stays at `/login`. An "Ошибка входа" entry is recorded in the audit log.
+**Expected:** Error message shown under the form. URL stays at `/login`. A "Login failed" entry is recorded in the audit log.
 
 ---
 
@@ -63,7 +63,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** On the login page.
 
-1. Leave both fields empty and click **Войти**.
+1. Leave both fields empty and click **Sign in**.
 
 **Expected:** Browser validation prevents submit (HTML5 `required` attributes). No API call is made.
 
@@ -94,7 +94,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in as admin.
 
-1. Click **Выйти** in the bottom of the sidebar.
+1. Click **Log out** in the bottom of the sidebar.
 
 **Expected:** Redirected to `/login`. `localStorage` entry `bar-pos-auth` no longer contains a `refreshToken`. Navigating to any protected URL redirects back to `/login`.
 
@@ -106,11 +106,11 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `tables` permission.
 
-1. Click **Столы** in the sidebar.
-2. Click **+ Открыть стол**.
-3. Enter a name (e.g. `Стол 5`) and click **Открыть**.
+1. Click **Tables** in the sidebar.
+2. Click **+ Open Table**.
+3. Enter a name (e.g. `Table 5`) and click **Open**.
 
-**Expected:** New card appears in the grid with status "Активен", total 0.00 ₽, 0 заказов. Card has a **Закрыть** button.
+**Expected:** New card appears in the grid with status "Active", total $0.00, 0 orders. Card has a **Close** button.
 
 ---
 
@@ -118,15 +118,15 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** At least one Active and one Closed table exist.
 
-1. Click **Активные**.
+1. Click **Active**.
 
 **Expected:** Only Active cards shown.
 
-2. Click **Закрытые**.
+2. Click **Closed**.
 
 **Expected:** Only Closed cards shown.
 
-3. Click **Все**.
+3. Click **All**.
 
 **Expected:** All cards shown.
 
@@ -136,10 +136,10 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** At least one Active table with at least one order.
 
-1. Click **Закрыть** on an active card.
+1. Click **Close** on an active card.
 2. Confirm in the dialog.
 
-**Expected:** Card status changes to "Закрыт". **Закрыть** button disappears from the card.
+**Expected:** Card status changes to "Closed". **Close** button disappears from the card.
 
 ---
 
@@ -159,9 +159,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** At least one Active table exists.
 
-1. Click **Открыть** on an active table card.
+1. Click **View** on an active table card.
 
-**Expected:** Table Detail page opens. Shows table name, status badge "Активен", empty orders list, and **+ Добавить товар** button.
+**Expected:** Table Detail page opens. Shows table name, status badge "Active", empty orders list, and **+ Add Item** button.
 
 ---
 
@@ -169,10 +169,10 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** On Table Detail of an Active table. Menu items exist.
 
-1. Click **+ Добавить товар**.
+1. Click **+ Add Item**.
 2. Type a partial item name in the search field.
 3. Click on a matching item in the list.
-4. Set quantity (default 1) and click **Добавить**.
+4. Set quantity (default 1) and click **Add**.
 
 **Expected:** Order row appears with correct item name, unit price, quantity, and line total. Running total at the bottom updates.
 
@@ -216,10 +216,10 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** On Table Detail of an Active table.
 
-1. Click **Закрыть стол**.
+1. Click **Close Table**.
 2. Confirm in the dialog.
 
-**Expected:** Status badge changes to "Закрыт". **+ Добавить товар** button disappears. Edit and delete icons disappear from all rows.
+**Expected:** Status badge changes to "Closed". **+ Add Item** button disappears. Edit and delete icons disappear from all rows.
 
 ---
 
@@ -227,7 +227,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Open detail of a Closed table.
 
-**Expected:** No **+ Добавить товар** button. No edit or delete icons on order rows.
+**Expected:** No **+ Add Item** button. No edit or delete icons on order rows.
 
 ---
 
@@ -235,7 +235,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Closed table with at least one order.
 
-1. Click **Скачать чек** (or the receipt/download button).
+1. Click **Download Receipt** (or the receipt/download button).
 
 **Expected:** A PDF file is downloaded. Opening it shows the table name, date, order lines with prices, and total.
 
@@ -247,9 +247,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `items` permission.
 
-1. Click **Меню** in the sidebar.
-2. Click **+ Добавить позицию**.
-3. Enter Name = `Test Item`, Price = `9.99`, Category = `food`. Click **Сохранить**.
+1. Click **Menu** in the sidebar.
+2. Click **+ Add Item**.
+3. Enter Name = `Test Item`, Price = `9.99`, Category = `food`. Click **Save**.
 
 **Expected:** Item appears in the list with correct name, price, and category badge.
 
@@ -261,7 +261,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Click the edit (pencil) icon on any item.
 2. Change the price.
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** Item row updates with the new price immediately.
 
@@ -272,9 +272,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 **Preconditions:** At least one available item exists.
 
 1. Click the edit icon on an item.
-2. Uncheck **Доступен** and save.
+2. Uncheck **Available** and save.
 
-**Expected:** Item shows a "Скрыт" badge or greyed-out state. It no longer appears in the Add Order search on Table Detail.
+**Expected:** Item shows a "Hidden" badge or greyed-out state. It no longer appears in the Add Order search on Table Detail.
 
 ---
 
@@ -313,7 +313,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** On the Add Item modal.
 
-1. Leave the Name field empty and click **Сохранить**.
+1. Leave the Name field empty and click **Save**.
 
 **Expected:** Form does not submit. Browser validation error shown on the Name field.
 
@@ -325,7 +325,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `stock` permission. At least one item with stock tracking enabled.
 
-1. Click **Склад** in the sidebar.
+1. Click **Stock** in the sidebar.
 2. Find an item, enter a positive number in the delta field (e.g. `5`).
 3. Click **+** (increase).
 
@@ -359,7 +359,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 1. Enter a delta greater than N in the decrease field.
 2. Click **−**.
 
-**Expected:** Inline error message "Insufficient stock" (or equivalent Russian text) shown in red next to the row buttons. Stock is not changed.
+**Expected:** Inline error message "Insufficient stock" shown in red next to the row buttons. Stock is not changed.
 
 ---
 
@@ -369,10 +369,10 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `users` permission.
 
-1. Click **Персонал** in the sidebar.
-2. Click **Добавить**.
+1. Click **Staff** in the sidebar.
+2. Click **Add**.
 3. Fill in: Name = `Test User`, Login = `testuser`, Password = `Pass1234!`, Role = `staff`.
-4. Click **Сохранить**.
+4. Click **Save**.
 
 **Expected:** User appears in the table with correct name, login, and role badge.
 
@@ -384,7 +384,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Click the edit icon on the user.
 2. Change the Role dropdown.
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** Role badge updates in the table.
 
@@ -396,7 +396,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Open edit modal.
 2. Leave the password field empty.
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** Save succeeds. User can still log in with their old password.
 
@@ -427,7 +427,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in as admin. Admin row is visible in the table.
 
-**Expected:** The delete button on the row where "Вы" badge appears is **disabled** and cannot be clicked.
+**Expected:** The delete button on the row where "You" badge appears is **disabled** and cannot be clicked.
 
 ---
 
@@ -436,7 +436,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 **Preconditions:** On the Create User modal.
 
 1. Enter a password shorter than 8 characters or without a digit/special character.
-2. Click **Сохранить**.
+2. Click **Save**.
 
 **Expected:** API returns an error. Error message is displayed in the form.
 
@@ -448,11 +448,11 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `roles` permission.
 
-1. Click **Роли** in the sidebar.
-2. Click **Новая роль**.
+1. Click **Roles** in the sidebar.
+2. Click **New Role**.
 3. Enter Name = `testrole`, Description = `Test`.
-4. Check two permissions (e.g. **Столы & заказы** and **Статистика**).
-5. Click **Сохранить**.
+4. Check two permissions (e.g. **Tables & orders** and **Statistics**).
+5. Click **Save**.
 
 **Expected:** New role appears in the table with the selected permission badges.
 
@@ -464,7 +464,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Click the edit icon on the role.
 2. Check or uncheck a permission.
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** Permission badges update in the table row.
 
@@ -485,7 +485,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Admin role is visible in the table.
 
-**Expected:** The delete button on the admin row is **disabled** and shows tooltip "Нельзя удалить admin". It cannot be clicked.
+**Expected:** The delete button on the admin row is **disabled** and shows tooltip "Can't delete admin". It cannot be clicked.
 
 ---
 
@@ -493,7 +493,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** A role with no permissions assigned exists (e.g. `staff`).
 
-**Expected:** The Права cell shows "нет прав" instead of empty badges.
+**Expected:** The Permissions cell shows "no permissions" instead of empty badges.
 
 ---
 
@@ -503,9 +503,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `stats` permission. At least one closed table with orders today.
 
-1. Click **Статистика** in the sidebar.
+1. Click **Statistics** in the sidebar.
 
-**Expected:** Date picker defaults to today. Four summary cards are shown: Выручка за день, Закрытые столы, Активные столы, Заказов, Обслужено столов. Bar chart shows items sold. Orders log table is populated.
+**Expected:** Date picker defaults to today. Summary cards are shown: Total Revenue, Locked, Running, Orders, Tables served. Bar chart shows items sold. Orders log table is populated.
 
 ---
 
@@ -516,9 +516,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 1. Go to Stats.
 
 **Expected:**
-- "Выручка за день" = total of all orders.
-- "Закрытые столы" = sum from closed tables only.
-- "Активные столы" = sum from active tables only.
+- "Total Revenue" = total of all orders.
+- "Locked" = sum from closed tables only.
+- "Running" = sum from active tables only.
 
 ---
 
@@ -528,7 +528,7 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 1. Change the date picker to `2020-01-01`.
 
-**Expected:** All stat cards show 0. Bar chart and orders log are hidden. Message "Нет данных за 2020-01-01" is shown.
+**Expected:** All stat cards show 0. Bar chart and orders log are hidden. Message "No data for 2020-01-01" is shown.
 
 ---
 
@@ -546,9 +546,9 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Logged in with `roles` permission. Several logins/actions have been performed.
 
-1. Click **Аудит** in the sidebar.
+1. Click **Audit** in the sidebar.
 
-**Expected:** Table shows events with columns: Время, Пользователь, Действие (colored badge), ID ресурса, IP.
+**Expected:** Table shows events with columns: Time, User, Action (colored badge), Resource ID, IP.
 
 ---
 
@@ -556,11 +556,11 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 **Preconditions:** Audit log has events of different types.
 
-1. Select **Ошибка входа** from the action filter dropdown.
+1. Select **Login failed** from the action filter dropdown.
 
-**Expected:** Only rows with "Ошибка входа" badge are shown. All other action types are hidden.
+**Expected:** Only rows with "Login failed" badge are shown. All other action types are hidden.
 
-2. Select **Все события**.
+2. Select **All events**.
 
 **Expected:** All events are shown again.
 
@@ -582,19 +582,19 @@ Perform the following actions and check the audit log:
 
 | Action | Expected audit event |
 |--------|---------------------|
-| Successful login | `Вход` with correct username and IP |
-| Failed login attempt | `Ошибка входа` with no username, correct IP |
-| Logout | `Выход` with username |
-| Create a role | `Роль создана` with resource ID |
-| Update a role | `Роль изменена` with resource ID |
-| Delete a role | `Роль удалена` with resource ID |
-| Create a user | `Пользователь создан` with resource ID |
-| Update a user | `Пользователь изменён` with resource ID |
-| Delete a user | `Пользователь удалён` with resource ID |
-| Create a discount policy | `Скидка создана` with resource ID |
-| Update a discount policy | `Скидка изменена` with resource ID |
-| Delete a discount policy | `Скидка удалена` with resource ID |
-| Add order with discount differing from active policy | `Скидка перезаписана` with order ID |
+| Successful login | "Login" with correct username and IP |
+| Failed login attempt | "Login failed" with no username, correct IP |
+| Logout | "Logout" with username |
+| Create a role | "Role created" with resource ID |
+| Update a role | "Role updated" with resource ID |
+| Delete a role | "Role deleted" with resource ID |
+| Create a user | "User created" with resource ID |
+| Update a user | "User updated" with resource ID |
+| Delete a user | "User deleted" with resource ID |
+| Create a discount policy | "Discount created" with resource ID |
+| Update a discount policy | "Discount updated" with resource ID |
+| Delete a discount policy | "Discount deleted" with resource ID |
+| Add order with discount differing from active policy | "Discount overridden" with order ID |
 
 ---
 
@@ -731,7 +731,7 @@ The discount input border turns amber.
 
 1. Log in as that user.
 
-**Expected:** Sidebar shows only **Столы**. Navigating directly to `/menu`, `/stock`, `/stats`, `/users`, `/roles`, `/audit` redirects to `/tables` (or shows an access-denied state).
+**Expected:** Sidebar shows only **Tables**. Navigating directly to `/menu`, `/stock`, `/stats`, `/users`, `/roles`, `/audit` redirects to `/tables` (or shows an access-denied state).
 
 ---
 
@@ -740,7 +740,7 @@ The discount input border turns amber.
 **Preconditions:** Logged in.
 
 1. Note the refresh token value in localStorage (`bar-pos-auth` → `state.refreshToken`).
-2. Click **Выйти**.
+2. Click **Log out**.
 3. Try to call `POST /api/v1/auth/refresh` with that token via API docs.
 
 **Expected:** `401 Unauthorized` — the token has been revoked on the server.
@@ -806,7 +806,7 @@ The discount input border turns amber.
 
 **Preconditions:** Closed table with at least two order lines with Cyrillic item names and mixed prices.
 
-1. Click **Скачать чек** on the closed table's detail page.
+1. Click **Download Receipt** on the closed table's detail page.
 2. Open the downloaded PDF.
 
 **Expected:** PDF contains:
@@ -820,7 +820,7 @@ The discount input border turns amber.
 
 ### TC-RECEIPT-02 — Receipt with QR code
 
-**Preconditions:** `RECEIPT_QR` and `RECEIPT_QR_TITLE` env vars are set (e.g. `RECEIPT_QR=https://example.com`, `RECEIPT_QR_TITLE=Наш сайт`). Container restarted after change.
+**Preconditions:** `RECEIPT_QR` and `RECEIPT_QR_TITLE` env vars are set (e.g. `RECEIPT_QR=https://example.com`, `RECEIPT_QR_TITLE=Our website`). Container restarted after change.
 
 1. Close a table with at least one order.
 2. Download the PDF receipt.
@@ -834,7 +834,7 @@ The discount input border turns amber.
 
 **Preconditions:** An active (not closed) table.
 
-**Expected:** The **Скачать чек** button is not shown on the Table Detail page while the table is Active.
+**Expected:** The **Download Receipt** button is not shown on the Table Detail page while the table is Active.
 
 ---
 
@@ -842,12 +842,12 @@ The discount input border turns amber.
 
 ### TC-ORDERS-01 — Price snapshot is immutable
 
-**Preconditions:** Active table has an order for Item A at price 100 ₽.
+**Preconditions:** Active table has an order for Item A at price $100.
 
-1. Go to Menu and change Item A's price to 200 ₽.
+1. Go to Menu and change Item A's price to $200.
 2. Return to the Table Detail.
 
-**Expected:** The existing order line still shows 100 ₽ (the price at order creation time). The running total is based on the original price, not the updated one.
+**Expected:** The existing order line still shows $100 (the price at order creation time). The running total is based on the original price, not the updated one.
 
 ---
 
@@ -987,9 +987,9 @@ The discount input border turns amber.
 
 ### TC-MENU-09 — Unavailable item excluded from order search
 
-**Preconditions:** Item Y is marked unavailable (not checked as **Доступен**).
+**Preconditions:** Item Y is marked unavailable (not checked as **Available**).
 
-1. Open an active table → **+ Добавить товар**.
+1. Open an active table → **+ Add Item**.
 2. Search for Item Y by name.
 
 **Expected:** Item Y does not appear in the search results. The item is hidden from order creation even if its exact name is typed.
@@ -1002,9 +1002,9 @@ The discount input border turns amber.
 
 **Preconditions:** A user with login `bartender1` already exists.
 
-1. Click **Добавить** to open the Create User modal.
+1. Click **Add** to open the Create User modal.
 2. Enter Login = `bartender1` (same as existing) and fill other required fields.
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** API returns an error. An error message is displayed in the form. No duplicate user is created.
 
@@ -1016,7 +1016,7 @@ The discount input border turns amber.
 
 1. Open the edit modal for that user.
 2. Enter a new password `abcdefgh` (8 chars, no digit or special character).
-3. Click **Сохранить**.
+3. Click **Save**.
 
 **Expected:** API returns validation error. Error message describes the password policy (≥8 chars + digit or special character). User's password is not changed.
 
@@ -1028,7 +1028,7 @@ The discount input border turns amber.
 
 **Preconditions:** At least 3 different items have orders today (or on the selected date).
 
-1. Go to **Статистика**.
+1. Go to **Statistics**.
 
 **Expected:** A bar chart (top items) is displayed showing item names and quantities/revenue. Items are ordered from most to least sold. The list shows at most 10 items by default.
 
@@ -1036,14 +1036,14 @@ The discount input border turns amber.
 
 ### TC-STATS-06 — Revenue split accuracy
 
-**Preconditions:** Fresh DB seed. Create Table A (add 2× Item at 100 ₽ each = 200 ₽ total), keep it active. Create Table B (add 1× Item at 150 ₽), close it.
+**Preconditions:** Fresh DB seed. Create Table A (add 2× Item at $100 each = $200 total), keep it active. Create Table B (add 1× Item at $150), close it.
 
-1. Go to **Статистика** → today.
+1. Go to **Statistics** → today.
 
 **Expected:**
-- "Выручка за день" = 350 ₽ (all orders)
-- "Активные столы" revenue = 200 ₽
-- "Закрытые столы" revenue = 150 ₽
+- "Total Revenue" = $350 (all orders)
+- "Running" revenue = $200
+- "Locked" revenue = $150
 
 ---
 
@@ -1051,19 +1051,19 @@ The discount input border turns amber.
 
 ### TC-CURRENCY-01 — Currency symbol reflects VITE_CURRENCY setting
 
-**Preconditions:** `VITE_CURRENCY=GEL` is set in `.env`. Client container restarted (`docker compose restart client`).
+**Preconditions:** `VITE_CURRENCY` is set to a non-default value in `.env`. Client container restarted (`docker compose restart client`).
 
 1. Log in and navigate to Tables, Menu, Stats, and Table Detail.
 
-**Expected:** All price displays use the ₾ symbol instead of ₽. Downloaded PDF receipt also shows ₾.
+**Expected:** All price displays use the configured currency symbol. Downloaded PDF receipt also reflects the configured symbol.
 
 ---
 
-### TC-CURRENCY-02 — Default currency is ₽ (RUB)
+### TC-CURRENCY-02 — Default currency is $ (USD)
 
-**Preconditions:** `VITE_CURRENCY` is not set (or set to `RUB`).
+**Preconditions:** `VITE_CURRENCY` is not set (or set to `USD`).
 
-**Expected:** All prices are displayed with the ₽ symbol throughout the UI and in PDF receipts.
+**Expected:** All prices are displayed with the `$` symbol throughout the UI and in PDF receipts.
 
 ---
 

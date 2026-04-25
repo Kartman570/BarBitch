@@ -55,14 +55,18 @@ class TableService:
                 orders_count=0, tables_served=0, items_sold=[], orders_log=[],
             )
 
-        # Fetch referenced items and tables in bulk
-        item_ids = list({o.item_id for o in orders})
+        # Fetch referenced tables in bulk
         table_ids = list({o.table_id for o in orders})
-        items = {i.id: i for i in self.session.exec(select(Item).where(Item.id.in_(item_ids))).all()}
         tables = {t.id: t for t in self.session.exec(select(Table).where(Table.id.in_(table_ids))).all()}
 
         def line_total(o: Order) -> float:
             return o.price * o.quantity * (1 - o.discount / 100)
+
+        def order_item_name(o: Order) -> str:
+            # Prefer the snapshot; fall back gracefully for legacy rows without it
+            if o.item_name:
+                return o.item_name
+            return f"Item #{o.item_id}" if o.item_id else "Unknown item"
 
         # Revenue split
         revenue_total = sum(line_total(o) for o in orders)
@@ -74,7 +78,7 @@ class TableService:
         # Items breakdown
         item_agg: dict = defaultdict(lambda: {"quantity": 0, "revenue": 0.0})
         for o in orders:
-            name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
+            name = order_item_name(o)
             item_agg[name]["quantity"] += o.quantity
             item_agg[name]["revenue"] += line_total(o)
 
@@ -89,7 +93,7 @@ class TableService:
                 order_id=o.id,
                 created_at=o.created_at,
                 table_name=tables[o.table_id].table_name if o.table_id in tables else f"Table #{o.table_id}",
-                item_name=items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}",
+                item_name=order_item_name(o),
                 quantity=o.quantity,
                 price=o.price,
                 discount=o.discount,
@@ -120,12 +124,9 @@ class TableService:
         if not orders:
             return []
 
-        item_ids = list({o.item_id for o in orders})
-        items = {i.id: i for i in self.session.exec(select(Item).where(Item.id.in_(item_ids))).all()}
-
         agg: dict = defaultdict(lambda: {"quantity": 0, "revenue": 0.0, "orders_count": 0})
         for o in orders:
-            name = items[o.item_id].name if o.item_id in items else f"Item #{o.item_id}"
+            name = o.item_name if o.item_name else (f"Item #{o.item_id}" if o.item_id else "Unknown item")
             lt = o.price * o.quantity * (1 - o.discount / 100)
             agg[name]["quantity"] += o.quantity
             agg[name]["revenue"] += lt
@@ -160,6 +161,7 @@ class TableService:
         order = Order(
             table_id=table.id,
             item_id=data.item_id,
+            item_name=item.name,
             quantity=data.quantity,
             price=item.price,
             discount=data.discount,

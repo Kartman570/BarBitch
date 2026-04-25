@@ -38,7 +38,7 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 3**   | Password complexity policy     | ✅ Done         |
 | **Phase 3**   | Rate limiting (login)          | ✅ Done         |
 | **Phase 3**   | Security headers + CORS        | ✅ Done         |
-| **Phase 3**   | Multilanguage support (EN/RU/KA) | ✅ Done       |
+| **Phase 3**   | Multilanguage support            | ✅ Done       |
 | **Phase 3**   | Pagination on list endpoints   | ❌ Planned      |
 | **Phase 3**   | Shifts Management              | ❌ Planned      |
 | **Phase 4**   | Bill / receipt export (PDF)    | ✅ Done         |
@@ -86,9 +86,9 @@ All settings live in `.env` (copy from `.env.example`).
 | `DEBUG` | — | `true` | Set `false` in production to hide `/docs` |
 | `RECEIPT_QR` | — | `""` | URL encoded as QR code on printed receipts |
 | `RECEIPT_QR_TITLE` | — | `""` | Caption text below the QR code |
-| `VITE_CURRENCY` | — | `USD` | Currency symbol in the UI: `RUB` (₽), `USD` ($), `EUR` (€), `GEL` (₾) |
+| `VITE_CURRENCY` | — | `USD` | Currency symbol shown in the UI (default: `$`). Set to any symbol; no rebuild needed — restart the client container to apply. |
 
-> **Changing currency:** set `VITE_CURRENCY=GEL` (or `USD`/`EUR`) in `.env`, then restart the client container:
+> **Changing currency:** set `VITE_CURRENCY` to your preferred symbol in `.env`, then restart the client container:
 > ```bash
 > docker compose restart client
 > ```

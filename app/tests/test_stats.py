@@ -176,7 +176,7 @@ class TestDailyStatsOrdersLog:
     def test_log_count_matches_orders_count(self, client):
         iid = _item(client, "Beer", 5.0)
         tid = _table(client)
-        for qty in [1.0, 2.0, 1.5]:
+        for qty in [1, 2, 3]:
             _order(client, tid, iid, qty=qty)
 
         d = client.get(f"{BASE}/stats/daily").json()

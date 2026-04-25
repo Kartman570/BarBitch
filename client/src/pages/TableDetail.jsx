@@ -10,10 +10,9 @@ import Spinner from '../components/Spinner'
 import { useT, useDateLocale, pluralItems } from '../i18n'
 import { CURRENCY } from '../currency'
 
-function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
+function OrderRow({ order, isActive, onDelete, onUpdateQty, t }) {
   const [editing, setEditing] = useState(false)
   const [qty, setQty] = useState(String(order.quantity))
-  const item = itemsMap[order.item_id]
   const discount = order.discount ?? 0
   const lineTotal = order.price * order.quantity * (1 - discount / 100)
 
@@ -25,7 +24,7 @@ function OrderRow({ order, itemsMap, isActive, onDelete, onUpdateQty, t }) {
 
   return (
     <tr>
-      <td>{item?.name ?? `${t('td_item_fallback')}${order.item_id}`}</td>
+      <td>{order.item_name || `${t('td_item_fallback')}${order.item_id ?? ''}`}</td>
       <td>
         {isActive && editing ? (
           <div className="flex items-center gap-1">
@@ -491,7 +490,7 @@ export default function TableDetail() {
                   <OrderRow
                     key={order.id}
                     order={order}
-                    itemsMap={itemsMap}
+
                     isActive={isActive}
                     t={t}
                     onDelete={(oid) => deleteOrderMutation.mutate(oid)}

@@ -159,7 +159,8 @@ class OrderCreate(BaseModel):
 class OrderRead(BaseModel):
     id: int
     table_id: int
-    item_id: int
+    item_id: Optional[int]
+    item_name: str
     quantity: int
     price: float
     discount: float
