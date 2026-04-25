@@ -132,17 +132,6 @@ docker compose exec app python -m cli seed-all --admin-password admin
 
 ---
 
-### TC-TABLES-03 — Close a table from the board
-
-**Preconditions:** At least one Active table with at least one order.
-
-1. Click **Close** on an active card.
-2. Confirm in the dialog.
-
-**Expected:** Card status changes to "Closed". **Close** button disappears from the card.
-
----
-
 ### TC-TABLES-04 — Empty state
 
 **Preconditions:** No tables in the DB.

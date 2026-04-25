@@ -1,68 +1,29 @@
-v_0.1.0
-# BarPOS — Open‑Source Bar Management System
-**MVP Scope** - Single bar deployment (one local server). FastAPI + SQLModel.
+# BarPOS — Open-Source Bar Management System
 
+An open-source web-native POS and stock system for bars, designed to replace proprietary solutions. Deploys on a single local server; no internet connection required during operation.
 
-## Purpose
+## Features
 
-BarPOS is an open‑source, (**licensename_TODO**)‑licensed application that replaces proprietary bar POS/stock systems.
-It aims to be easy to deploy on a single local server (one bar → one instance) while remaining extensible for multi‑location setups later.
-
-## Core Principles
-
-| Principle                | Explanation                                                                                                          |
-|--------------------------|----------------------------------------------------------------------------------------------------------------------|
-| **Freedom (OpenSource)** | Anyone can use, fork, or build SaaS offerings without copyleft restrictions.                                         |
-| **Web‑native**           | Front end runs entirely in the browser - easy access from any device (pc, smartphone, etc.). No platform lock‑in.    |
-| **Offline‑capable**      | Architecture allows to deploy local instance within WiFi network. No need in external server or even internet access |
-| **Transparent**          | Audit log planned for money‑ and stock‑affecting actions.                                                            |
-
-
-
-## Current Implementation Status
-
-| Phase         | Focus                          | Status         |
-|---------------|--------------------------------|----------------|
-| **Phase 1**   | DB Models                      | ✅ Done         |
-| **Phase 1**   | Backend REST API               | ✅ Done         |
-| **Phase 1**   | Daily Stats endpoint           | ✅ Done         |
-| **Phase 1**   | Backend tests                  | ✅ Done         |
-| **Phase 1**   | Streamlit frontend             | ✅ Done (stub)  |
-| **Phase 2**   | Stock Management               | ✅ Done         |
-| **Phase 2**   | Low-stock alerts               | ✅ Done      |
-| **Phase 3**   | User Authentication + RBAC     | ✅ Done         |
-| **Phase 3**   | JWT enforcement on all routes  | ✅ Done         |
-| **Phase 3**   | Token expiry → redirect login  | ✅ Done         |
-| **Phase 3**   | Refresh token + revocation     | ✅ Done         |
-| **Phase 3**   | Password complexity policy     | ✅ Done         |
-| **Phase 3**   | Rate limiting (login)          | ✅ Done         |
-| **Phase 3**   | Security headers + CORS        | ✅ Done         |
-| **Phase 3**   | Multilanguage support            | ✅ Done       |
-| **Phase 4**   | Bill / receipt export (PDF)    | ✅ Done         |
-| **Phase 5**   | Audit Logging                  | ✅ Done         |
-| **Phase 5**   | Discount Policy System         | ✅ Done         |
-| **Phase 6**   | Payment Processing             | ❌ Planned      |
-
+- **Tables & Orders** — open tabs, add items, track running totals, close bills
+- **Menu Management** — item catalog with categories, availability toggles, and optional stock tracking
+- **Staff & RBAC** — role-based access control with four built-in roles (admin, manager, barman, cook)
+- **Daily Statistics** — revenue breakdown (locked vs. running), items sold, orders log
+- **Discount Policies** — time-bounded, per-item or global discount rules with audit trail
+- **PDF Receipts** — A6 Unicode-ready receipts with optional QR code
+- **Audit Log** — tracks all money- and stock-affecting actions
+- **Multilanguage UI** — English, Russian, Georgian (KA) via built-in i18n layer
 
 ## Quick Start
 
-### One-command setup (recommended for first run)
+### One-command setup (recommended)
 
 ```bash
 ./start.sh
 ```
 
-The script will:
-- Create `.env` from `.env.example` and generate a `SECRET_KEY` if needed
-- Tear down any existing containers and volumes (clean slate)
-- Build all images
-- Start services and wait for them to be healthy
-- Run database migrations
-- Seed default roles, an admin user, and a sample menu
-- Run the test suite (aborts if any test fails)
+The script creates `.env`, generates a `SECRET_KEY`, builds images, runs migrations, seeds default roles and a sample menu, and runs the test suite. You will be prompted for the admin password.
 
-You will be prompted for the admin password. To run non-interactively:
-
+Non-interactive:
 ```bash
 ./start.sh --admin-password=yourpassword
 ```
@@ -70,136 +31,47 @@ You will be prompted for the admin password. To run non-interactively:
 ### Manual setup
 
 ```bash
-cp .env.example .env          # fill in SECRET_KEY and POSTGRES_PASSWORD
+cp .env.example .env          # set SECRET_KEY and POSTGRES_PASSWORD
 docker compose build
 docker compose up -d
 docker compose exec app alembic upgrade head
 docker compose exec app python -m cli seed-all --admin-password <password>
 ```
 
-| Service   | URL                        |
-|-----------|----------------------------|
-| Frontend  | http://localhost:8501      |
-| API       | http://localhost:8000      |
-| API docs  | http://localhost:8000/docs |
-| DB        | localhost:5432             |
+### Service URLs
 
+| Service  | URL                        |
+|----------|----------------------------|
+| Frontend | http://localhost:5173      |
+| API      | http://localhost:8000      |
+| API docs | http://localhost:8000/docs |
+| Database | localhost:5432             |
+
+### Default credentials
+
+After seeding: `username=admin` / `password=admin` — **change before production use.**
 
 ## Configuration
 
 All settings live in `.env` (copy from `.env.example`).
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `SECRET_KEY` | ✅ | — | JWT signing key. Generate: `openssl rand -hex 32` |
-| `POSTGRES_PASSWORD` | ✅ | `postgres` | PostgreSQL password |
-| `DEBUG` | — | `true` | Set `false` in production to hide `/docs` |
-| `RECEIPT_QR` | — | `""` | URL encoded as QR code on printed receipts |
-| `RECEIPT_QR_TITLE` | — | `""` | Caption text below the QR code |
-| `VITE_CURRENCY` | — | `USD` | Currency symbol shown in the UI (default: `$`). Set to any symbol; no rebuild needed — restart the client container to apply. |
+| Variable            | Required | Default | Description |
+|---------------------|----------|---------|-------------|
+| `SECRET_KEY`        | ✅       | —       | JWT signing key. Generate: `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | ✅       | `postgres` | PostgreSQL password |
+| `DEBUG`             |          | `true`  | Set `false` in production to hide `/docs` |
+| `RECEIPT_QR`        |          | `""`    | URL encoded as QR code on printed receipts |
+| `RECEIPT_QR_TITLE`  |          | `""`    | Caption text below the QR code |
+| `VITE_CURRENCY`     |          | `USD`   | Currency symbol shown in the UI (`USD` → `$`, `EUR` → `€`, `GEL` → `₾`, `RUB` → `₽`) |
 
-> **Changing currency:** set `VITE_CURRENCY` to your preferred symbol in `.env`, then restart the client container:
-> ```bash
-> docker compose restart client
-> ```
-> No rebuild needed. The backend is not affected — it stores only numeric values.
+> **Changing currency:** update `VITE_CURRENCY` in `.env`, then `docker compose restart client`. No rebuild needed.
 
-## Development Setup
+## Documentation
 
-### Database migrations (run inside `app/` container)
-
-```bash
-# After changing models:
-docker compose exec app alembic revision --autogenerate -m "description"
-docker compose exec app alembic upgrade head
-```
-
-### Database initialization (CLI)
-
-```bash
-docker compose exec app python -m cli seed-all       # init DB + admin user + seed items
-docker compose exec app python -m cli init-db        # just create tables
-docker compose exec app python -m cli create-user --name Admin
-docker compose exec app python -m cli seed-items --if-empty
-```
-
-### Tests
-
-```bash
-docker compose exec app pytest                          # all tests
-docker compose exec app pytest app/tests/test_v1.py    # API endpoint tests
-docker compose exec app pytest app/tests/test_auth.py  # auth & RBAC tests
-docker compose exec app pytest app/tests/test_stock.py # stock management tests
-docker compose exec app pytest app/tests/test_stats.py # daily stats tests
-```
-
-Tests run against an in-memory SQLite database (isolated per test function).
-CI runs pytest on every push to `main` and every PR via GitHub Actions.
-
-
-## Project Structure
-
-```
-app/
-  main.py                  FastAPI entry point
-  api/
-    router.py              mounts sub-routers under /api
-    routes_v1.py           active v1 endpoints (auth, roles, users, items, tables, orders, stats, discounts)
-  models/
-    models.py              SQLModel table definitions (Role, User, Item, Table, Order, DiscountPolicy)
-  schemas/
-    schemas_order.py       Pydantic request/response schemas
-  services/
-    table_service.py       business logic (table lifecycle, orders, stock, stats)
-    auth_service.py        password hashing (bcrypt), JWT, refresh tokens, default roles
-    receipt_service.py     PDF receipt generation (fpdf2, A6, Unicode)
-  fonts/
-    DejaVuSans.ttf         bundled Unicode font for PDF receipts
-    DejaVuSans-Bold.ttf
-  core/
-    database.py            engine + get_session dependency
-    config.py              reads POSTGRES_URL, SECRET_KEY env vars
-  migrations/              Alembic migration files
-  tests/
-    conftest.py            SQLite test fixtures
-    test_v1.py             API endpoint tests
-    test_auth.py           auth & RBAC tests
-    test_stock.py          stock management tests
-    test_stats.py          daily stats tests
-  cli.py                   management CLI (seed-all, init-db, seed-roles, create-user, seed-items)
-
-client/
-  app.py                   Streamlit frontend (permission-aware UI)
-  api.py                   HTTP client wrapper for the backend API
-  requirements.txt
-  Dockerfile
-
-docs/
-  architecture.md          system architecture and API/DB schema
-  frontend_design.md       UI screen specifications
-  manual_testing.md        QA test scripts
-  user_management.md       role & permission system details
-
-docker-compose.yml
-pyproject.toml             pytest config
-```
-
-
-## API Overview
-
-All endpoints are versioned under `/api/v1/`. All routes except login require `Authorization: Bearer <token>`. Full schema in `docs/architecture.md`.
-
-| Resource       | Endpoints |
-|----------------|-----------|
-| Auth           | `POST /auth/login` → access + refresh token; `POST /auth/refresh`; `POST /auth/logout` |
-| Roles          | CRUD `/api/v1/roles/` |
-| Users          | CRUD `/api/v1/users/` + `?name=` filter |
-| Items (menu)   | CRUD `/api/v1/items/` with `?name=`, `?category=`, `?available_only=` filters; `PATCH /items/{id}/stock` (delta adjustment) |
-| Tables         | CRUD `/api/v1/tables/` + `POST /tables/{id}/close` |
-| Receipt        | `GET /api/v1/tables/{id}/receipt` → PDF download (A6, Unicode) |
-| Orders         | CRUD `/api/v1/tables/{id}/orders/` (nested; deducts stock on create) |
-| Daily stats    | `GET /api/v1/stats/daily?date=YYYY-MM-DD` |
-| Discounts      | CRUD `/api/v1/discounts/` (requires `discounts` permission); `GET /discounts/for-item/{id}` returns active policy for barmen |
-| Audit log      | `GET /api/v1/audit/events` (requires `roles` permission) |
-
-Interactive API docs: http://localhost:8000/docs
+| Document | Contents |
+|----------|----------|
+| [docs/architecture.md](docs/architecture.md) | Tech stack, request flow, full API schema, DB schema, nginx HTTPS setup |
+| [docs/development.md](docs/development.md) | Docker commands, migrations, CLI, tests, key source files |
+| [docs/user_management.md](docs/user_management.md) | RBAC roles, permissions, authentication flow |
+| [docs/frontend_design.md](docs/frontend_design.md) | UI screens, components, user flows |
+| [docs/frontend_i18n.md](docs/frontend_i18n.md) | Internationalisation layer (EN/RU/KA) |
