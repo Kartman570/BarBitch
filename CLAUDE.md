@@ -24,6 +24,15 @@ The frontend supports EN / RU / KA via a lightweight custom i18n layer — no ex
 > Never run `python`, `pytest`, `alembic`, or `pip` directly on the host — the project has no local venv.
 
 ### First-time setup
+
+**One command (recommended):**
+```bash
+./start.sh                          # prompts for admin password
+./start.sh --admin-password=<pass>  # non-interactive
+```
+Handles `.env` creation (auto-generates `SECRET_KEY`), clean build, migrations, and seed.
+
+**Manual:**
 ```bash
 cp .env.example .env
 # Edit .env — set SECRET_KEY and POSTGRES_PASSWORD before starting

@@ -29,8 +29,7 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 1**   | Backend tests                  | ✅ Done         |
 | **Phase 1**   | Streamlit frontend             | ✅ Done (stub)  |
 | **Phase 2**   | Stock Management               | ✅ Done         |
-| **Phase 2**   | Low-stock alerts               | ❌ Planned      |
-| **Phase 2**   | Recipe Components              | ❌ Planned      |
+| **Phase 2**   | Low-stock alerts               | ✅ Done      |
 | **Phase 3**   | User Authentication + RBAC     | ✅ Done         |
 | **Phase 3**   | JWT enforcement on all routes  | ✅ Done         |
 | **Phase 3**   | Token expiry → redirect login  | ✅ Done         |
@@ -39,10 +38,7 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 | **Phase 3**   | Rate limiting (login)          | ✅ Done         |
 | **Phase 3**   | Security headers + CORS        | ✅ Done         |
 | **Phase 3**   | Multilanguage support            | ✅ Done       |
-| **Phase 3**   | Pagination on list endpoints   | ❌ Planned      |
-| **Phase 3**   | Shifts Management              | ❌ Planned      |
 | **Phase 4**   | Bill / receipt export (PDF)    | ✅ Done         |
-| **Phase 4**   | WebSocket Real-time            | ❌ Planned      |
 | **Phase 5**   | Audit Logging                  | ✅ Done         |
 | **Phase 5**   | Discount Policy System         | ✅ Done         |
 | **Phase 6**   | Payment Processing             | ❌ Planned      |
@@ -50,29 +46,43 @@ It aims to be easy to deploy on a single local server (one bar → one instance)
 
 ## Quick Start
 
+### One-command setup (recommended for first run)
+
 ```bash
+./start.sh
+```
+
+The script will:
+- Create `.env` from `.env.example` and generate a `SECRET_KEY` if needed
+- Tear down any existing containers and volumes (clean slate)
+- Build all images
+- Start services and wait for them to be healthy
+- Run database migrations
+- Seed default roles, an admin user, and a sample menu
+- Run the test suite (aborts if any test fails)
+
+You will be prompted for the admin password. To run non-interactively:
+
+```bash
+./start.sh --admin-password=yourpassword
+```
+
+### Manual setup
+
+```bash
+cp .env.example .env          # fill in SECRET_KEY and POSTGRES_PASSWORD
 docker compose build
-docker compose up
+docker compose up -d
+docker compose exec app alembic upgrade head
+docker compose exec app python -m cli seed-all --admin-password <password>
 ```
 
-| Service   | URL                      |
-|-----------|--------------------------|
-| Frontend  | http://localhost:8501    |
-| API       | http://localhost:8000    |
+| Service   | URL                        |
+|-----------|----------------------------|
+| Frontend  | http://localhost:8501      |
+| API       | http://localhost:8000      |
 | API docs  | http://localhost:8000/docs |
-| DB        | localhost:5432           |
-
-Default credentials: **admin / admin** (created by `seed-all`).
-
-> **Note:** Existing accounts created before the password complexity policy (≥8 chars + digit/special) are not affected retroactively.
-
-### Seed initial data (first run)
-
-```bash
-docker compose exec app python -m cli seed-all
-```
-
-This creates the DB schema, an Admin user, and a sample menu.
+| DB        | localhost:5432             |
 
 
 ## Configuration
